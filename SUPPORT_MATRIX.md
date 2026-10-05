@@ -59,7 +59,7 @@ and `atlas lens check` report against the installed bundle.
 | Registry ID | Level | Lens | ASA | Notes |
 |---|---|---|---|---|
 | Qwen3.5-9B-Q6_K | Supported | supported (uncalibrated legacy bundle) | supported (A/B-validated May 2026) | Reference model; hash-pinned public download |
-| gemma-4-12b-it-Q4_K_M | Preview | supported; calibration **derived + verified** on maintainer hardware (val AUC 0.73, 287 LCB samples) — live lens reports `cx_calibrated: true`. The published HF bundle is still the uncalibrated one; re-publishing the calibrated bundle is a maintainer decision (moderate AUC, shared artifact) | Preview — vector built, published, hash-pinned; **on by default**: the installer builds the vector (or `atlas model install` downloads the hash-pinned one) and writes its `.model` marker, so llama-server applies it at scale 0.5 on every start. Not A/B-measured on gemma; to run without it, install with `ATLAS_BOOTSTRAP_SKIP_ASA=1`. Not Supported until an A/B effect measurement + quality-regression bounds exist (see § Feature paths — ASA steering) | Manual GGUF download (Gemma ToU); artifacts hash-pinned |
+| gemma-4-12b-it-Q4_K_M | Preview | supported, but with no usable signal in 3.1.x: an install reports `cx_calibrated: true` from calibration files fit to a different cost field than the published one, and per-token scoring cannot run under the default pooling ([#281](https://github.com/inferstep/ATLAS/issues/281)). Fixes planned for 3.2.0 | Preview — vector built, published, hash-pinned; **on by default**: the installer builds the vector (or `atlas model install` downloads the hash-pinned one) and writes its `.model` marker, so llama-server applies it at scale 0.5 on every start. Not A/B-measured on gemma; to run without it, install with `ATLAS_BOOTSTRAP_SKIP_ASA=1`. Not Supported until an A/B effect measurement + quality-regression bounds exist (see § Feature paths — ASA steering) | Manual GGUF download (Gemma ToU); artifacts hash-pinned |
 | Qwen3.5-9B-Q4_K_M / Q8_0 | Preview | unverified (same-family artifacts, combo unvalidated) | unverified | Hash-pinned public downloads |
 | Qwen3.5-7B / 14B / 32B | Preview | no-artifacts | no-artifacts | HF-gated upstream (HF_TOKEN required; no anonymous hash) |
 | Bring-your-own GGUF | Preview | Requires `atlas lens build` (per-model bundle) | Requires `atlas asa build` | Direct agent mode works model-agnostically; V3 scoring/steering need the per-model bundle — see § Model contract |
@@ -96,10 +96,15 @@ Reference model (Qwen3.5-9B-Q6_K), current: `model_runtime` supported,
 supported, `lens_calibration` **uncalibrated** (legacy bundle predates
 the calibration files), `lens_intervention` **neutral**, `asa`
 supported (A/B-validated). A default gemma install reports
-`lens_calibration` **uncalibrated** (the calibration files are not
-published), `lens_intervention` **neutral**, and `asa` supported: the
-installer writes the steering vector's marker by default (not
-A/B-measured on gemma).
+`lens_calibration` **calibrated** and `lens_intervention` **active**,
+because the calibration files tracked in this repository are loaded
+next to the published cost field. That report is misleading in 3.1.x:
+the calibration was fit to a different cost field, per-token scoring
+cannot run under the default pooling, and the scores barely change
+between inputs, so the lens neither vetoes nor alerts
+([#281](https://github.com/inferstep/ATLAS/issues/281)). `asa` is
+supported: the installer writes the steering vector's marker by
+default (not A/B-measured on gemma).
 
 ### Lens bundle provenance
 

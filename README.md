@@ -28,6 +28,8 @@
 </p>
 
 
+> **Status: experimental.** The 3.1 line's verification has known gaps, listed under **Known Limitations** below. The fixes are planned for 3.2.0. Until then, do not rely on a "verified" or "completed" from ATLAS: review what it writes and run your own tests.
+
 ## 🌎 What is ATLAS?
 
 **ATLAS is a local coding agent that brings frontier-style reasoning and verification to compact open models.** It puts more intelligence in the system around the model (planning, candidate generation, quality scoring, sandboxed testing, and repair) so smaller models can tackle real software work entirely on your own hardware, without a hosted API or per-token fees.
@@ -153,7 +155,10 @@ Apple Silicon runs natively through the macOS hybrid Metal path (native llama-se
 
 - **Linux Docker stack, plus a native macOS path.** NVIDIA (Supported), AMD ROCm (Community-tested), and Vulkan (Preview) Docker paths exist today; Apple Silicon (Supported) runs via the native macOS hybrid Metal path ([#32](https://github.com/inferstep/ATLAS/issues/32)). Intel Arc / SYCL is Roadmap. Level definitions: [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
 - **ATLAS has no current benchmark result.** The V3.0 LiveCodeBench figure is withdrawn (see Latest News), and no capability or reliability figure has been measured for the current release. Numbers will be published only after a re-measurement on held-out tasks; model-specific results are tracked in [#28](https://github.com/inferstep/ATLAS/issues/28).
-- **Known issue in 3.1.4 to 3.1.6: a failing V3 candidate can be written as verified.** When the V3 pipeline handles an edit and no candidate passes its tests, even after repair, ATLAS writes the best-scoring candidate anyway and tells the agent the edit was verified. Review files that V3 rewrote, and run your project's own tests before you rely on a "done". The fix is on `dev` ([e8112d3](https://github.com/inferstep/ATLAS/commit/e8112d3)) and ships in 3.2.0.
+- **Known issues in 3.1.x (fixes planned for 3.2.0).** Review what ATLAS writes and run your project's own tests before you rely on a "done".
+  - **A failing V3 candidate can be written as verified (3.1.0 to 3.1.6).** When the V3 pipeline handles an edit and no candidate passes its tests, even after repair, ATLAS writes the best-scoring candidate anyway and tells the agent the edit was verified. The fix is on `dev` ([e8112d3](https://github.com/inferstep/ATLAS/commit/e8112d3)).
+  - **C, C++, Swift, JSX, Vue and Svelte files are checked as Python (3.1.6).** V3 handles these files but tests their candidates as Python, so the candidates fail, and the issue above then applies.
+  - **The lens gives no usable signal (3.1.3 to 3.1.6).** It reports `calibrated` and `interventions active`, but with the default settings its per-token scoring cannot run, so it cannot veto a candidate or raise an alert, and its scores barely change between inputs, so V3 always gets three candidates. The calibration files in the repository were also fit to a different cost field than the published one ([#281](https://github.com/inferstep/ATLAS/issues/281)).
 - **Complex feature additions can be inconsistent.** Compact models sometimes spend agent turns exploring an unfamiliar codebase before writing code.
 - **Grammar-constrained decoding is slower than unconstrained decoding.**
 
