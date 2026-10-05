@@ -273,7 +273,7 @@ echo "ATLAS_HSA_OVERRIDE_GFX_VERSION=10.3.0" >> .env
 docker compose -f docker-compose.yml -f docker-compose.rocm.yml up -d --force-recreate llama-server
 ```
 
-If this works for you on a previously-unsupported card, please leave a note on [GH #26](https://github.com/itigges22/ATLAS/issues/26) — community-tested overrides feed into the next release's docs.
+If this works for you on a previously-unsupported card, please leave a note on [GH #26](https://github.com/inferstep/ATLAS/issues/26) — community-tested overrides feed into the next release's docs.
 
 ### RDNA4 (RX 9070 / 9070 XT, gfx1200 / gfx1201) — ROCm 7.x required
 
@@ -468,7 +468,7 @@ All ports are configurable via `.env`. See [CONFIGURATION.md](CONFIGURATION.md).
 
 **Applies to:** NVIDIA GPUs older than Blackwell — RTX 40xx (Ada), RTX 30xx
 (Ampere), RTX 20xx / T4 (Turing), GTX 10xx (Pascal), V100/A100/H100/L4 —
-running the prebuilt `ghcr.io/itigges22/atlas-llama` image. The sibling
+running the prebuilt `ghcr.io/inferstep/atlas-llama` image. The sibling
 errors `invalid device function` (runtime) and
 `nvcc fatal: unsupported gpu architecture` (local build) have the same cause.
 (For the same error on AMD, see [the ROCm entry](#amd-gpu-is-unsupported-by-rocm-but-you-want-to-try-anyway-no-kernel-image-on-rocm).)
@@ -484,7 +484,7 @@ This is an image/GPU mismatch, not a driver or VRAM problem.
 # Your GPU's compute capability (8.9 = Ada, 8.6 = Ampere, 7.5 = Turing, 12.0 = Blackwell)
 nvidia-smi --query-gpu=name,compute_cap --format=csv
 # What the image was built for (Blackwell-only image prints sm_120/sm_121)
-docker run --rm --entrypoint bash ghcr.io/itigges22/atlas-llama:latest \
+docker run --rm --entrypoint bash ghcr.io/inferstep/atlas-llama:latest \
   -c 'grep -ao "sm_[0-9]*" /usr/local/bin/llama-server | sort -u'
 ```
 If your compute capability is below 12.0 and the image only lists
@@ -1004,4 +1004,4 @@ If your issue isn't listed here:
 1. Check service logs: `docker compose logs <service-name>`
 2. Check the proxy health endpoint: `curl http://localhost:8090/health`
 3. See [CONFIGURATION.md](CONFIGURATION.md) for all environment variables
-4. Open an issue on [GitHub](https://github.com/itigges22/ATLAS/issues)
+4. Open an issue on [GitHub](https://github.com/inferstep/ATLAS/issues)

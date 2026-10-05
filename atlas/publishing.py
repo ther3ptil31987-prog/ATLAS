@@ -23,7 +23,7 @@ from atlas.display import (
     safe_print as _safe_print,
 )
 
-UPSTREAM_REPO = "itigges22/ATLAS"
+UPSTREAM_REPO = "inferstep/ATLAS"
 REGISTRY_PATH = "atlas/commands/model_registry.py"
 
 
@@ -455,7 +455,7 @@ def publish_preflight(kind: str, dry_run: bool, color: bool) -> bool:
     _safe_print("  ──────────────────────────────────────────")
     _safe_print("  Publish does TWO things in one command:")
     _safe_print("    1. Uploads the artifact to a HuggingFace repo you own")
-    _safe_print("    2. Opens a registry PR against github.com/itigges22/ATLAS")
+    _safe_print("    2. Opens a registry PR against github.com/inferstep/ATLAS")
     _safe_print("  Full walkthrough: docs/PUBLISHING.md")
     _safe_print("")
 
@@ -497,7 +497,7 @@ def publish_preflight(kind: str, dry_run: bool, color: bool) -> bool:
          gh_ok, required=False,
          hint=(f"{YELL_}optional{RESET_} — without it we'll print the PR "
                "body for you to paste at "
-               "https://github.com/itigges22/ATLAS/compare"))
+               "https://github.com/inferstep/ATLAS/compare"))
     _safe_print("")
 
     if dry_run:

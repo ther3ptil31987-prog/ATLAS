@@ -1152,7 +1152,7 @@ before publishing.
 ## Registry submission
 
 To get ATLAS users this support automatically via `atlas model list`,
-open a PR against https://github.com/itigges22/ATLAS using the body
+open a PR against https://github.com/inferstep/ATLAS using the body
 `atlas lens publish` produced. PC-059 (#101) tracks the manual-review
 flow; PC-060 (#102) tracks the eventual auto-merge pipeline.
 """
@@ -1383,7 +1383,7 @@ def _emit_publish(args: argparse.Namespace, color: bool) -> int:
                     if args.dry_run else
                     f"  {GREEN if color else ''}Upload complete.{RESET if color else ''} "
                     "Paste the body above into a PR at "
-                    "https://github.com/itigges22/ATLAS/compare")
+                    "https://github.com/inferstep/ATLAS/compare")
         return 0
 
     if not publishing.gh_available():
@@ -1393,7 +1393,7 @@ def _emit_publish(args: argparse.Namespace, color: bool) -> int:
         _safe_print(f"  {GREEN if color else ''}Upload complete.{RESET if color else ''} "
                     "Install `gh` (https://cli.github.com) and re-run "
                     "without --skip-pr to auto-open, or paste the body above "
-                    "into https://github.com/itigges22/ATLAS/compare manually.")
+                    "into https://github.com/inferstep/ATLAS/compare manually.")
         return 0
 
     # The PR is built through the GitHub API (branch + commit + PR) so it

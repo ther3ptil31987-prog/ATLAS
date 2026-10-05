@@ -100,9 +100,7 @@ func sendRawChat(ctx context.Context, proxyURL, modelID, message string,
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	if tok := loadBearerToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setProxyAuth(req)
 
 	started := time.Now()
 	resp, err := (&http.Client{Transport: &http.Transport{
@@ -231,9 +229,7 @@ func submitFeedback(proxyURL, sessionID, thumbs string, files []fileVerdict) (in
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if tok := loadBearerToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setProxyAuth(req)
 	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
 	if err != nil {
 		return 0, err
@@ -276,9 +272,7 @@ func fetchTrainingStatus(proxyURL string) (trainingStatus, error) {
 	if err != nil {
 		return ts, err
 	}
-	if tok := loadBearerToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setProxyAuth(req)
 	resp, err := (&http.Client{Timeout: 3 * time.Second}).Do(req)
 	if err != nil {
 		return ts, err
@@ -310,9 +304,7 @@ func postPermissionDecision(proxyURL, sessionID, toolCallID, decision, scope str
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if tok := loadBearerToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setProxyAuth(req)
 	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
 	if err != nil {
 		return err
@@ -335,9 +327,7 @@ func cancelTurn(proxyURL, sessionID string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if tok := loadBearerToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setProxyAuth(req)
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -394,9 +384,7 @@ func sendChatOpts(ctx context.Context, proxyURL, message, workingDir, mode,
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	if tok := loadBearerToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setProxyAuth(req)
 
 	// No overall timeout — agent turns can run minutes for long
 	// generations. Connection-level timeout only.
@@ -462,9 +450,9 @@ func parseChatSSE(ctx context.Context, r io.Reader, out chan<- chatEvent) error 
 	return scanner.Err()
 }
 
-// loadBearerToken returns the bearer token for /v1/agent if a keys
-// file is configured. The proxy doesn't currently enforce auth, but
-// the file is created by `atlas init` for forward compatibility.
+// loadBearerToken returns the token from the api-keys file, if one is
+// configured. setProxyAuth sends it only when no service token is: a proxy
+// with a service token accepts that token and nothing else.
 //
 // Search order: $ATLAS_API_KEYS_PATH, then ./secrets/api-keys.json
 // relative to cwd. Returns "" if no token is found — caller must
@@ -548,6 +536,19 @@ func loadServiceToken() string {
 	return strings.TrimSpace(string(data))
 }
 
+// setProxyAuth puts the credential the proxy checks on a request to it. The
+// service token wins: when the installation has one, the proxy accepts only
+// it, and sending the api-keys token instead got a 401 on every call.
+func setProxyAuth(req *http.Request) {
+	tok := serviceToken
+	if tok == "" {
+		tok = loadBearerToken()
+	}
+	if tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+}
+
 type tokenTransport struct {
 	base http.RoundTripper
 }
@@ -564,9 +565,10 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return base.RoundTrip(req)
 }
 
-// installTokenTransport covers every nil-Transport client in the TUI
-// (chat SSE, permission/cancel/feedback POSTs, calibration probe,
-// events stream) through the process default transport.
+// installTokenTransport covers the clients that use the process default
+// transport and set no header themselves. Requests that build their own
+// transport (the chat stream, the raw demo lane, the events stream) set
+// the header with setProxyAuth; the wrapper never ran for them.
 func installTokenTransport() {
 	if serviceToken == "" {
 		return
@@ -616,6 +618,7 @@ func streamEvents(ctx context.Context, eventsURL string, out chan<- Envelope) er
 		return fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Accept", "text/event-stream")
+	setProxyAuth(req)
 
 	client := &http.Client{
 		// No timeout on the response body — SSE streams indefinitely.

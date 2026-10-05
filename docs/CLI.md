@@ -312,20 +312,24 @@ Cycle with `Ctrl+T`:
 
 | Mode | Behavior |
 |---|---|
-| `default` | Read tools and surgical edits (`edit_file`, `structural_edit`) auto-allow; `write_file`, `delete_file`, `run_command`, and `stop_background` require user approval |
-| `accept-edits` | As above + `write_file` auto-allow; `delete_file`, `run_command`, and `stop_background` still confirm |
+| `default` | Read tools, in-place edits (`edit_file`, `structural_edit`, `insert_after`) and `move_file` auto-allow; `write_file`, `delete_file` and every command (`run_command`, `run_background`, `stop_background`) require user approval |
+| `accept-edits` | As above + `write_file` auto-allow; `delete_file` and every command still confirm |
 | `yolo` | Auto-allow everything |
 
-The exact gate is `Destructive: true` on the tool definition in
-`proxy/tools.go`; `accept-edits` additionally auto-approves
-`write_file`, `edit_file`, `structural_edit`, and `move_file`.
+The exact gate is `needsPermission` in `proxy/agent.go`: outside yolo,
+every tool that runs a command asks; otherwise `Destructive: true` on the
+tool definition in `proxy/tools.go` decides, and `accept-edits`
+additionally auto-approves `write_file`, `edit_file`, `structural_edit`,
+and `move_file`. A session approval never covers `delete_file`.
 
 The current mode shows in the header.
 
 ### Approval prompt
 
-When a destructive tool needs approval, the turn pauses and a bordered
-prompt appears above the input box showing the tool and what it will do:
+When a tool needs approval, the turn pauses and a bordered prompt appears
+above the input box showing the tool and what it will do. A command is shown
+whole, wrapped over as many rows as it needs; one too long for the screen
+keeps its first and last lines in view and says how many are not shown:
 
 ```
 ⚠ Permission required
@@ -337,7 +341,9 @@ Run command: npm install
 - **`y`** — allow this one call.
 - **`a`** — allow this tool for the rest of the session; you won't be
   asked again for it (the tool is added to the request's
-  `session_allowed_tools` on later turns).
+  `session_allowed_tools` on later turns). A deletion is the exception: each
+  file is asked about, the prompt offers only `y` and `n`, and `a` allows
+  that one file. A new session (`/clear`) starts with no approvals.
 - **`n`** / **`Esc`** — deny; the model is told the call was refused and
   continues.
 

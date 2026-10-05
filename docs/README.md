@@ -61,7 +61,7 @@ map of the repository itself, see [MAP.md](MAP.md).
 3. `atlas doctor` for a one-shot health report, and
    `atlas diagnostics collect` for a shareable, redacted support bundle
    (both documented in [CLI.md](CLI.md)).
-4. Still stuck? [Open an issue](https://github.com/itigges22/ATLAS/issues)
+4. Still stuck? [Open an issue](https://github.com/inferstep/ATLAS/issues)
    — paste the doctor output.
 
 ### Understand how it works
@@ -81,11 +81,16 @@ map of the repository itself, see [MAP.md](MAP.md).
 
 ### Contribute
 
-- [../CONTRIBUTING.md](../CONTRIBUTING.md) — workflow, style, tests,
-  and the developer quality gate (`scripts/production-readiness.py`).
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — from finding an issue and
+  `/claim` to review and release; style, tests, and the developer quality
+  gate (`scripts/production-readiness.py`).
 - [DEVELOPMENT.md](DEVELOPMENT.md) — dev mode, targeted rebuilds,
   running the proxy on the host against the compose stack.
-- [RELEASE.md](RELEASE.md) — the release contract and verification levels.
+- [RELEASE.md](RELEASE.md) — the release contract, verification levels,
+  versioning, and the release and hotfix steps.
+- [TRIAGE.md](TRIAGE.md) — how new issues become Ready work.
+- [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) — what to do when a key
+  leaks, a release is bad, or automation misbehaves.
 - [CONTAINER_PACKAGING.md](CONTAINER_PACKAGING.md) — image accounts,
   writable dirs, dependency pinning.
 - [../GOVERNANCE.md](../GOVERNANCE.md), [../MAINTAINERS.md](../MAINTAINERS.md),

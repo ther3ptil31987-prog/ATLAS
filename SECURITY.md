@@ -43,14 +43,21 @@ the sandbox with conservative memory/CPU/PID caps, never unlimited.
 
 Two defaults reduce accidental data exposure:
 
-**Sensitive-file exclusion** — the agent's read tools refuse known
+**Sensitive-file exclusion** — the agent's file tools keep known
 credential-bearing files (`.env` and variants, `.netrc`, `.npmrc`,
 `.pypirc`, key files, SSH/AWS/kube/docker credential stores,
-`secrets/service-token`, `secrets/api-keys.json`) so their contents never enter model context, session
-files, or lens training samples by default. A user who knows a
+`secrets/service-token`, `secrets/api-keys.json`) out of model context,
+session files and lens training samples by default: `read_file` and
+`outline_file` refuse them, `search_files` skips them and never follows a
+symlink, and `move_file` refuses to move one to another name. A user who knows a
 specific file is non-sensitive can include it explicitly by setting
 `ATLAS_ALLOW_CREDENTIAL_READS=1` on the proxy (the refusal message
 says exactly this). `.env.example` stays readable — it's a template.
+
+Shell commands are not covered. `run_command` and `run_background` run
+in the sandbox, where the workspace is mounted, so `cat .env` there
+reads the file. In the default and accept-edits modes every command
+asks for approval first, and the prompt shows the whole command.
 
 **Private-value filtering** — log output across all services passes
 through a shared filter that masks credential-shaped values
@@ -66,13 +73,15 @@ the exclusion rule above is the primary control.
 
 ## Reporting a vulnerability
 
-Please report vulnerabilities privately via [GitHub Security Advisories](https://github.com/itigges22/ATLAS/security/advisories/new) rather than opening a public issue.
+Please report vulnerabilities privately via [GitHub Security Advisories](https://github.com/inferstep/ATLAS/security/advisories/new) rather than opening a public issue.
 
 Include what you can of: the affected component (proxy, TUI, CLI, v3-service, geometric-lens, sandbox, install scripts), reproduction steps, and the impact under the single-user local model above.
 
 You can expect an acknowledgment within a week. Fixes for confirmed vulnerabilities land on `dev` and are promoted to a release as soon as they are validated; credit is given in the changelog unless you ask otherwise.
 
 If GitHub advisories are unavailable to you, open a minimal public issue saying "security — need a private channel" **without details**, and the maintainer will provide one.
+
+How the maintainers respond once a report is in (containment, fixes, communication) is in [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md).
 
 ## Severity and response targets
 

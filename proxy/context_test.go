@@ -349,3 +349,54 @@ func TestExecuteToolCallRejectsWorkspaceEscape(t *testing.T) {
 		t.Fatalf("result = %+v, want workspace rejection", res)
 	}
 }
+
+// encoding/json decodes "PATH" or "ſource" into the handler's field, so a
+// value under such a key never passed the workspace check or the deny-list.
+// Each is refused, and nothing outside the workspace is read or written.
+func TestAnArgumentNameThatIsNotLowercaseIsRefused(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside\n"), 0o644)
+	secret := filepath.Join(outside, "secret.txt")
+	os.WriteFile(secret, []byte("OUTSIDE\n"), 0o644)
+	escaped := filepath.Join(outside, "escaped.txt")
+	calls := []struct{ tool, args string }{
+		{"read_file", `{"PATH":` + jsonQuote(secret) + `}`},
+		{"read_file", `{"path":"inside.txt","Path":` + jsonQuote(secret) + `}`},
+		{"write_file", `{"Path":` + jsonQuote(escaped) + `,"content":"x\n"}`},
+		{"move_file", `{"source":"inside.txt","ſource":` + jsonQuote(secret) + `,"destination":"moved.txt"}`},
+		{"run_command", `{"Command":"rm -rf /"}`}, // the deny-list reads "command"
+	}
+	for _, c := range calls {
+		ctx := NewAgentContext(root, Tier2Medium)
+		ctx.PermissionMode = PermissionYolo
+		res := executeToolCall(c.tool, json.RawMessage(c.args), ctx)
+		if res.Success || !strings.Contains(res.Error, "argument names are lowercase") {
+			t.Errorf("%s %s = %+v, want a refusal", c.tool, c.args, res)
+		}
+		if strings.Contains(string(res.Data), "OUTSIDE") {
+			t.Errorf("%s %s returned the outside file", c.tool, c.args)
+		}
+	}
+	if _, err := os.Stat(escaped); err == nil {
+		t.Fatal("write_file wrote outside the workspace")
+	}
+	if _, err := os.Stat(secret); err != nil {
+		t.Fatal("move_file moved a file from outside the workspace")
+	}
+}
+
+// insert_after takes a path like every other write, so the dispatcher checks
+// it the same way.
+func TestInsertAfterIsCheckedForTheWorkspace(t *testing.T) {
+	root, outside := t.TempDir(), t.TempDir()
+	args := `{"path":` + jsonQuote(filepath.Join(outside, "x.py")) + `,"line":0,"content":"x = 1\n"}`
+	res := executeToolCall("insert_after", json.RawMessage(args), NewAgentContext(root, Tier2Medium))
+	if res.Success || !strings.Contains(res.Error, "outside the workspace") {
+		t.Fatalf("insert_after outside the workspace = %+v, want the workspace refusal", res)
+	}
+}
+
+func jsonQuote(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}

@@ -141,7 +141,7 @@ load_config
 
 # GHCR namespace for the service images (templates/*.yaml.tmpl render
 # ghcr.io/${ATLAS_GHCR_OWNER}/...). Default: upstream-published images.
-ATLAS_GHCR_OWNER="${ATLAS_GHCR_OWNER:-itigges22}"
+ATLAS_GHCR_OWNER="${ATLAS_GHCR_OWNER:-inferstep}"
 export ATLAS_GHCR_OWNER
 
 # Lens training-data corpus hostPath (atlas-proxy template). Defaulted

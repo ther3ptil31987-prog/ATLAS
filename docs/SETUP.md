@@ -13,7 +13,7 @@ The install steps depend on your hardware + OS. Find the row that matches your s
 | NVIDIA RTX 50-series / Blackwell (B100, GB10) | Linux | [Method 0: bootstrap](#method-0-one-shot-bootstrap) or [Method 1: Docker](#method-1-docker-compose-recommended) | Supported — published CUDA image targets Blackwell |
 | NVIDIA RTX 20/30/40, GTX 10xx, datacenter (V100/A100/H100/T4/L4) | Linux | [Method 1: Docker](#method-1-docker-compose-recommended) + one-time [local rebuild](#cuda-compute-capability-dockerfilev31) | Preview — local rebuild required |
 | NVIDIA GPU | Windows (WSL2) | [Method 1: Docker — NVIDIA section](#method-1-docker-compose-recommended) | Unsupported — untested, no claims made; reports welcome |
-| AMD GPU (RX 6000/7000, MI200+) | Linux | [Method 1: Docker — AMD ROCm](#amd-rocm--whats-different) | Community-tested ([GH #26](https://github.com/itigges22/ATLAS/issues/26)) |
+| AMD GPU (RX 6000/7000, MI200+) | Linux | [Method 1: Docker — AMD ROCm](#amd-rocm--whats-different) | Community-tested ([GH #26](https://github.com/inferstep/ATLAS/issues/26)) |
 | **Apple Silicon (M1/M2/M3/M4)** | **macOS** | **[SETUP_MACOS.md](SETUP_MACOS.md)** (dedicated guide — hybrid native Metal + Docker) | Supported (maintainer-verified, M2 Pro) |
 | Intel Arc / Iris Xe | Linux | [Method 1: Docker — Vulkan](#vulkan--cross-vendor-fallback) | Preview — Vulkan is smoke-tested on lavapipe only; no real-GPU validation yet |
 | Snapdragon X Elite (laptops) | Linux | [Vulkan](#vulkan--cross-vendor-fallback) + [arm64 section](#arm64) | Preview (Linux arm64). Windows on ARM is Unsupported |
@@ -49,7 +49,7 @@ Single curl command that detects your distro, installs Docker + nvidia-container
 > Full arch table: [CUDA Compute Capability](#cuda-compute-capability-dockerfilev31).
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh | bash
 ```
 
 Or, from a checkout:
@@ -101,10 +101,10 @@ atlas doctor            # gpu check WARNS ("CPU-only mode — very slow"); warns
 ```bash
 # Run as your normal user; sudo elevates as needed (Docker install, etc).
 # Install ends up owned by you.
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh | bash
 
 # Run via sudo. SUDO_USER is detected, install still ends up owned by you.
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh | sudo bash
 
 # Real root login (no sudo) — install owned by root. Only do this if there's
 # no human user on the box (CI runner, container, etc).
@@ -117,11 +117,11 @@ pipe a moving `main` script into bash):
 # Pinned to a release: fetch the script AT the tag and install that tag.
 # The checkout is pinned to the (SSH-signed) tag and ATLAS_IMAGE_TAG is
 # pinned to the matching cosign-signed images.
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/v3.1.3/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.3 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
 
 # Review before running: download, read, then execute the same bytes.
-curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh
+curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh
 less atlas-bootstrap.sh
 bash atlas-bootstrap.sh
 ```
@@ -145,7 +145,7 @@ bash atlas-bootstrap.sh
 **Why `/opt/atlas`?** It's the standard FHS prefix for system-wide third-party software, survives `$HOME` cleanup, and lets multiple users on the same box share one install. If you'd rather it land in your home dir:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh \
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh \
   | ATLAS_INSTALL_DIR=$HOME/atlas bash
 ```
 
@@ -217,7 +217,7 @@ This is the most heavily exercised deployment method: CI validates the compose f
 
 ```bash
 # 1. Clone
-git clone https://github.com/itigges22/ATLAS.git
+git clone https://github.com/inferstep/ATLAS.git
 cd ATLAS
 
 # 2. Install the ATLAS CLI (puts `atlas` in ~/.local/bin)
@@ -375,12 +375,12 @@ For Jetson, swap to `nvcr.io/nvidia/l4t-jetpack:r36.3.0` in both build args (l4t
 
 - No prebuilt arm64 images on GHCR yet — arm64 users must build locally with the recipes above. Prebuilt multi-arch images will land once at least one arm64 device has been validated end-to-end.
 - Bootstrap installer (`scripts/atlas-bootstrap.sh`) hasn't been audited for arm64 paths.
-- Hardware testing matrix is empty for all five target devices — early adopters with any of these please drop your `atlas doctor` output and `vulkaninfo --summary` on [#115](https://github.com/itigges22/ATLAS/issues/115).
+- Hardware testing matrix is empty for all five target devices — early adopters with any of these please drop your `atlas doctor` output and `vulkaninfo --summary` on [#115](https://github.com/inferstep/ATLAS/issues/115).
 
 ### What Happens on First Run
 
 1. Docker pulls 5 prebuilt container images from
-   `ghcr.io/itigges22/atlas-{proxy,v3,lens,llama,sandbox}` (~3 min on a
+   `ghcr.io/inferstep/atlas-{proxy,v3,lens,llama,sandbox}` (~3 min on a
    fast connection). To build from source instead (the dev path), run
    `docker compose build` before the `up` step — see "Image source"
    below.
@@ -411,7 +411,7 @@ ATLAS_IMAGE_TAG=sha-abc1234  # exact commit
 ATLAS_IMAGE_TAG=dev          # bleeding edge from dev branch
 ```
 
-Available tags are listed at <https://github.com/itigges22/ATLAS/pkgs/container/atlas-proxy>
+Available tags are listed at <https://github.com/inferstep/ATLAS/pkgs/container/atlas-proxy>
 (swap `atlas-proxy` for the other service names: `atlas-v3`,
 `atlas-lens`, `atlas-llama`, `atlas-sandbox`).
 
@@ -550,7 +550,7 @@ Run all services as local processes without containers. Useful for development o
 
 ```bash
 # 1. Clone and install Python CLI
-git clone https://github.com/itigges22/ATLAS.git
+git clone https://github.com/inferstep/ATLAS.git
 cd ATLAS
 pip install -e .
 
@@ -778,8 +778,8 @@ Any GPU with 8 GB+ VRAM and a llama.cpp-supported backend:
 |---|---|---|---|---|
 | NVIDIA (Blackwell — RTX 50xx, B100, GB10) | CUDA | Supported (published image) | `inference/Dockerfile.v31` | RTX 5060 Ti 16GB (primary dev) |
 | NVIDIA (pre-Blackwell — RTX 20xx–40xx, GTX 10xx, V100/A100/H100/T4/L4) | CUDA | Preview — one-time [local rebuild required](#cuda-compute-capability-dockerfilev31) | `inference/Dockerfile.v31` + `--build-arg CUDA_ARCH=<cc>` | — (upstream llama.cpp supports these; no maintainer validation on ATLAS) |
-| AMD | ROCm / HIP | Community-tested | `inference/Dockerfile.rocm` | RX 7900 XTX (community smoke-test, [GH #26](https://github.com/itigges22/ATLAS/issues/26)) |
-| Apple Silicon | Metal | Supported (macOS hybrid: native llama-server + Docker, [#32](https://github.com/itigges22/ATLAS/issues/32)) | `scripts/atlas-setup-macos.sh` + `docker-compose.macos.yml` | M2 Pro 32GB (verified); M3/M4 (target) |
+| AMD | ROCm / HIP | Community-tested | `inference/Dockerfile.rocm` | RX 7900 XTX (community smoke-test, [GH #26](https://github.com/inferstep/ATLAS/issues/26)) |
+| Apple Silicon | Metal | Supported (macOS hybrid: native llama-server + Docker, [#32](https://github.com/inferstep/ATLAS/issues/32)) | `scripts/atlas-setup-macos.sh` + `docker-compose.macos.yml` | M2 Pro 32GB (verified); M3/M4 (target) |
 | Any (cross-vendor fallback) | Vulkan | Preview | `inference/Dockerfile.vulkan` | lavapipe (CPU ICD) smoke-tested; no real-GPU validation yet |
 | Intel Arc | SYCL | Roadmap — Intel Arc uses Vulkan today | TBD | Arc A770 16GB (target) |
 

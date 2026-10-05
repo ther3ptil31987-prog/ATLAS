@@ -31,7 +31,7 @@ Notes:
 ## Install — TL;DR
 
 ```bash
-git clone https://github.com/itigges22/ATLAS.git
+git clone https://github.com/inferstep/ATLAS.git
 cd ATLAS
 
 # One-time setup (5-10 minutes): brew deps + builds llama.cpp with Metal
@@ -296,4 +296,4 @@ Inference will be slower but you don't need brew, cmake, or the setup script.
 - [ ] Pre-built `llama-server-metal` binaries on GHCR releases (skip the build step)
 - [ ] Pure-native path (drop Docker entirely on Mac, use launchd) — separate ticket if there's demand
 
-Report issues on [#32](https://github.com/itigges22/ATLAS/issues/32) with your Mac model + memory size + `atlas doctor` output.
+Report issues on [#32](https://github.com/inferstep/ATLAS/issues/32) with your Mac model + memory size + `atlas doctor` output.

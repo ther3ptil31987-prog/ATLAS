@@ -67,7 +67,7 @@ rebuild resolves the same set:
 | `sandbox/requirements-verify.txt` | In-sandbox verify/lint tools (pytest, ruff, mypy, requests) |
 
 The proxy's two Alpine packages are pinned in `proxy/Dockerfile`
-(`curl=8.21.0-r0`, `bash=5.3.9-r1`).
+(`curl=8.22.0-r0`, `bash=5.3.9-r1`).
 
 `tests/infrastructure/test_dependency_pinning.py` asserts the pinning
 policy: requirements files carry `==` pins on every entry, inline

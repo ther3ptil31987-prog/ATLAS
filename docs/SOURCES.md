@@ -55,7 +55,7 @@ The current release ships C(x) (MLP cost field) and G(x) (XGBoost quality predic
 
 ### Structural code reasoning (shipped)
 
-Tree-sitter-backed structural tooling: `structural_edit`, the symbol index, the structural veto on unresolved calls, and the flag-gated call-graph layer (`ATLAS_CALL_GRAPH`). Tracked as [issue #39](https://github.com/itigges22/ATLAS/issues/39).
+Tree-sitter-backed structural tooling: `structural_edit`, the symbol index, the structural veto on unresolved calls, and the flag-gated call-graph layer (`ATLAS_CALL_GRAPH`). Tracked as [issue #39](https://github.com/inferstep/ATLAS/issues/39).
 
 - **Sotnikov, D., 2026.** *chiasmus: tree-sitter + solver call graph for code analysis.* GitHub [yogthos/chiasmus](https://github.com/yogthos/chiasmus). Inspiration for the structural code-reasoning layer.
 
@@ -104,7 +104,7 @@ Research that informs planned work. None of these are part of the current releas
 
 ### V3.2 (exploratory)
 
-- **Karan & Chatterji, 2025.** *Reasoning with Sampling: Your Base Model is Smarter Than You Think.* arXiv [2510.14901](https://arxiv.org/abs/2510.14901). MCMC over logits during decoding — tracked as [issue #9](https://github.com/itigges22/ATLAS/issues/9).
+- **Karan & Chatterji, 2025.** *Reasoning with Sampling: Your Base Model is Smarter Than You Think.* arXiv [2510.14901](https://arxiv.org/abs/2510.14901). MCMC over logits during decoding — tracked as [issue #9](https://github.com/inferstep/ATLAS/issues/9).
 
 ---
 

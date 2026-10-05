@@ -187,63 +187,88 @@ var shellFindDeleteRe = regexp.MustCompile(
 // a bomb from a benign `f() { ls | grep x; }`.
 var shellForkBombRe = regexp.MustCompile(`\(\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;`)
 
-// shellDeviceWriteRe matches filesystem/device destruction: mkfs/wipefs, `dd`
-// onto a device, or a redirect straight onto a block device.
-var shellDeviceWriteRe = regexp.MustCompile(
-	`\b(mkfs\S*|wipefs)\b|\bdd\b[^|;&]*\bof=/dev/|(^|\s)>\s*/dev/(sd|nvme|mmcblk|vd|hd|xvd)`)
+// shellDeviceWriteRe matches a redirect straight onto a block device. The
+// commands that format or overwrite a device (mkfs, wipefs, dd of=/dev/...)
+// are matched at a command position instead (catastrophicCommand), so a
+// command that only mentions one, like `grep mkfs notes.txt`, is allowed.
+var shellDeviceWriteRe = regexp.MustCompile(`(^|\s)>\s*/dev/(sd|nvme|mmcblk|vd|hd|xvd)`)
 
-// shellWrapperRe matches a `bash -c "…"` / `sh -c '…'` / `eval …` prefix so we
-// can unwrap it and run the catastrophic checks against the REAL command — a
-// model that wraps `rm -rf /` in `bash -c` must not slip past the denylist.
-var shellWrapperRe = regexp.MustCompile(`^\s*(?:(?:bash|sh|zsh|dash|ksh)\s+-c|eval)\s+`)
-
-// unwrapShellWrapper strips one `bash -c "…"` / `eval "…"` layer (and the
-// surrounding quotes) so catastrophic-pattern checks see the inner command.
-func unwrapShellWrapper(seg string) string {
-	loc := shellWrapperRe.FindStringIndex(seg)
-	if loc == nil {
-		return seg
-	}
-	inner := strings.TrimSpace(seg[loc[1]:])
-	if len(inner) >= 2 {
-		if (inner[0] == '"' && inner[len(inner)-1] == '"') ||
-			(inner[0] == '\'' && inner[len(inner)-1] == '\'') {
-			inner = inner[1 : len(inner)-1]
-		}
-	}
-	return inner
+// validateShellCommand rejects catastrophic commands (whole-project wipe,
+// fork bomb, device destruction) and execution wrappers that cannot be inspected
+// within the quoting and depth limits. Everything else — mv, cp, mkdir, rm of specific
+// files, chmod, sed -i, > redirects, build/test/run — is allowed.
+//
+// It is the one command policy: every tool that runs a command goes through
+// it, before dispatch (shouldDenyToolCall) and in the tool itself. There were
+// two, and they disagreed: run_command's deny-list saw through `env rm -rf /`
+// and `(rm -rf /)` and run_background's check did not.
+func validateShellCommand(cmd string) string {
+	return inspectShellCommand(cmd)
 }
 
-// validateShellCommand returns a non-empty rejection reason ONLY for a command
-// that is catastrophic even inside the sandbox jail (whole-project wipe, fork
-// bomb, device destruction). Everything else — mv, cp, mkdir, rm of specific
-// files, chmod, sed -i, > redirects, build/test/run — is allowed.
-func validateShellCommand(cmd string) string {
-	stripped := strings.TrimSpace(cmd)
-	if stripped == "" {
-		return ""
+// commandSegments splits a command line where a new command can start: at
+// `;`, `|`, `&`, newlines, a subshell's parentheses, and command
+// substitution. Single quotes hide everything; double quotes hide the
+// operators but not `$(...)` or backticks, which the shell still runs.
+func commandSegments(cmd string) []string {
+	var out []string
+	var cur strings.Builder
+	cut := func() {
+		out = append(out, cur.String())
+		cur.Reset()
 	}
-	// Whole-command checks (survive segment splitting / wrapper quoting).
-	unwrapped := unwrapShellWrapper(stripped)
-	if shellForkBombRe.MatchString(stripped) || shellForkBombRe.MatchString(unwrapped) {
-		return "run_command refused: that is a fork bomb — it would exhaust the sandbox's process table. If you need to spawn processes, run them one at a time."
-	}
-	if shellDeviceWriteRe.MatchString(stripped) || shellDeviceWriteRe.MatchString(unwrapped) {
-		return "run_command refused: writing to a block device or formatting a filesystem (dd/mkfs/wipefs) is blocked. Work with files under the project directory instead."
-	}
-
-	for _, seg := range splitShellSegments(stripped) {
-		seg = strings.TrimSpace(seg)
-		if seg == "" {
+	inSingle, inDouble := false, false
+	for i := 0; i < len(cmd); i++ {
+		c := cmd[i]
+		switch {
+		case c == '\\' && !inSingle && i+1 < len(cmd):
+			cur.WriteByte(c)
+			cur.WriteByte(cmd[i+1])
+			i++
+			continue
+		case c == '\'' && !inDouble:
+			inSingle = !inSingle
+		case c == '"' && !inSingle:
+			inDouble = !inDouble
+		case inSingle:
+		case c == '`' || c == ')' || (c == '$' && i+1 < len(cmd) && cmd[i+1] == '('):
+			cut()
+			if c == '$' {
+				i++ // the `(` of `$(`
+			}
+			continue
+		case inDouble:
+		case c == ';' || c == '|' || c == '&' || c == '\n' || c == '(':
+			cut()
 			continue
 		}
-		seg = unwrapShellWrapper(seg)
-		if msg := catastrophicRm(seg); msg != "" {
-			return msg
+		cur.WriteByte(c)
+	}
+	cut()
+	return out
+}
+
+// catastrophicCommand checks the command one segment runs.
+func catastrophicCommand(seg string) string {
+	fields := strings.Fields(seg)
+	i := commandPosition(fields)
+	if i >= len(fields) {
+		return ""
+	}
+	head, args := filepath.Base(fields[i]), fields[i+1:]
+	switch {
+	case head == "rm":
+		return catastrophicRm(args)
+	case head == "wipefs" || head == "mkfs" || strings.HasPrefix(head, "mkfs."):
+		return "refused: formatting or wiping a filesystem (mkfs/wipefs) is blocked. Work with files under the project directory instead."
+	case head == "dd":
+		for _, a := range args {
+			if strings.HasPrefix(a, "of=/dev/") {
+				return "refused: dd onto a device is blocked. Work with files under the project directory instead."
+			}
 		}
-		if shellFindDeleteRe.MatchString(seg) {
-			return "run_command refused: `find ... -delete` / `-exec rm` recursively deletes from the search root (usually the whole project). Delete specific files with `rm <file>` or the delete_file tool."
-		}
+	case head == "find" && shellFindDeleteRe.MatchString(seg):
+		return "refused: `find ... -delete` / `-exec rm` recursively deletes from the search root (usually the whole project). Delete specific files with `rm <file>` or the delete_file tool."
 	}
 	return ""
 }
@@ -252,18 +277,10 @@ func validateShellCommand(cmd string) string {
 // project (or root / home). A targeted recursive delete of a subdirectory
 // (`rm -rf __pycache__`, `rm -rf node_modules`, `rm -rf build`) is allowed —
 // only roots and glob-everything targets are catastrophic.
-func catastrophicRm(seg string) string {
-	fields := strings.Fields(seg)
-	i := 0
-	for i < len(fields) && (fields[i] == "sudo" || strings.Contains(fields[i], "=")) {
-		i++ // skip a sudo / leading VAR=val env prefix
-	}
-	if i >= len(fields) || filepath.Base(fields[i]) != "rm" {
-		return ""
-	}
+func catastrophicRm(args []string) string {
 	recursive := false
 	var targets []string
-	for _, f := range fields[i+1:] {
+	for _, f := range args {
 		if strings.HasPrefix(f, "--") {
 			if f == "--recursive" {
 				recursive = true
@@ -283,7 +300,7 @@ func catastrophicRm(seg string) string {
 	}
 	for _, t := range targets {
 		if isCatastrophicDeleteTarget(t) {
-			return "run_command refused: `rm -r` of " + t + " would wipe the whole project (or root). Delete a specific subdirectory by name instead (e.g. `rm -rf build`), or use delete_file."
+			return "refused: `rm -r` of " + t + " would wipe the whole project (or root). Delete a specific subdirectory by name instead (e.g. `rm -rf build`), or use delete_file."
 		}
 	}
 	return ""

@@ -2368,6 +2368,12 @@ func needsPermission(ctx *AgentContext, toolName string, args json.RawMessage) b
 		}
 	}
 
+	// Anything that runs a command asks, whatever the tool is called:
+	// run_background started any command without a prompt while run_command
+	// asked for the same one.
+	if commandTools[toolName] {
+		return true
+	}
 	// Destructive tools need permission in default mode
 	return tool.Destructive
 }

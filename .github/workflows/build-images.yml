@@ -1,6 +1,6 @@
 # Builds and publishes ATLAS service images to GHCR.
 #
-# Image names: ghcr.io/itigges22/atlas-{proxy,v3,lens,llama,llama-vulkan,sandbox}
+# Image names: ghcr.io/inferstep/atlas-{proxy,v3,lens,llama,llama-vulkan,sandbox}
 #
 # Two-phase publish:
 #   Phase 1 (build matrix): every service pushes an immutable :sha-<short>
@@ -137,6 +137,9 @@ jobs:
     name: alias image tag
     if: github.event_name == 'workflow_dispatch' && inputs.alias_tag != ''
     runs-on: ubuntu-latest
+    # An alias can repoint any tag, :latest included, so it takes the same
+    # approval as a release. Dispatch it from main (production's branch).
+    environment: production
     permissions:
       contents: read
       packages: write
@@ -319,9 +322,9 @@ jobs:
       # dev/latest/semver tags the promote job repoints later, since
       # imagetools create reuses the same manifest digest. Verify with:
       #   cosign verify \
-      #     --certificate-identity-regexp 'github.com/itigges22/ATLAS' \
+      #     --certificate-identity-regexp 'github.com/inferstep/ATLAS' \
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      #     ghcr.io/itigges22/atlas-<svc>@<digest>
+      #     ghcr.io/inferstep/atlas-<svc>@<digest>
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
@@ -344,6 +347,11 @@ jobs:
     # `needs: build` already guarantees all six services published.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    # Each promotion is a deployment record (scripts/setup/environments.sh):
+    # dev pushes go to `dev`, release-candidate tags (v*-*) to `staging`,
+    # and main pushes and release tags to `production`, which waits for
+    # the release owner's approval before :latest or a version tag moves.
+    environment: ${{ github.ref == 'refs/heads/dev' && 'dev' || (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-') && 'staging') || 'production' }}
     permissions:
       contents: read
       packages: write

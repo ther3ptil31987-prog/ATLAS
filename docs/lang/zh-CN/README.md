@@ -10,7 +10,7 @@
 <p align="center"><b>Adaptive Test-time Learning and Autonomous Specialization</b></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-V3.1.3-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-V3.1.6-blue" alt="Version"/>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/model-agnostic-green" alt="模型无关"/>
 </p>
@@ -45,7 +45,7 @@
 - **2026-06-17** - **[V3.1.2 "Maia" 发布](https://github.com/itigges22/ATLAS/releases/tag/v3.1.2)** - 更广的硬件覆盖（ROCm / Metal / Vulkan）、自带模型的 Lens + ASA 训练、基于自有工作负载的在环 lens 重训练，以及一轮 agent 可靠性加固
 - **2026-05-12** - **[V3.1.0 "Maia" 发布](https://github.com/itigges22/ATLAS/releases/tag/v3.1.0)** - 原生 Bubbletea TUI、一条命令的 bootstrap、流式 Lens + ASA 激活操控、感知 AST 的外科式编辑
 - **2026-03-26** - [Hacker News 首页](https://news.ycombinator.com/item?id=47533297) - 489 点赞、285 条评论
-- **2026-03-05** - **[V3.0 发布](../../reports/V3_ABLATION_STUDY.md)** - 在冻结的 Qwen3-14B 上实现 74.6% LiveCodeBench pass@1-v(k=3)（pass@1，k=3 个生成候选、Lens 选择与修复 - 不是单次生成的 pass@1；[方法论](../../reports/V3_ABLATION_STUDY.md)）
+- **2026-03-05** - **V3.0 发布** - 在冻结的 Qwen3-14B 上运行的多阶段 V3 流水线。*随本次发布公布的 LiveCodeBench 74.6% 已撤回：基准测试运行器从未运行 LiveCodeBench 的隐藏测试，并且只要三个候选之一、或看过失败输出的修复通过题面给出的示例，就把任务记为通过（[撤回说明](../../reports/V3_ABLATION_STUDY.md)）。当前产品重新验证后将重新测量。*
 - **2026-02-18** - **[V2.0 发布](../../../CHANGELOG.md)** - 基准测试基础设施、HumanEval/MBPP/LiveCodeBench/GPQA/SciCode 评估套件
 
 ## ⭐ Star 历史
@@ -117,8 +117,8 @@ curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-
 不想把一个随 `main` 变动的脚本直接管道进 bash？还是同一个安装器，另有两种更稳妥的运行方式：
 ```bash
 # Pinned to a release: script, checkout, and images all at the signed tag
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/v3.1.3/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.3 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
 
 # Review before running
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh
@@ -146,7 +146,7 @@ Apple Silicon 通过原生 macOS 混合 Metal 方案运行（原生 llama-server
 ## ⚠️ 已知限制
 
 - **Linux Docker 栈，外加一条原生 macOS 路径。** NVIDIA（支持 (Supported)）、AMD ROCm（社区验证 (Community-tested)）和 Vulkan（预览 (Preview)）的 Docker 路径今天即已存在；Apple Silicon（支持）通过原生 macOS 混合 Metal 方案运行 ([#32](https://github.com/itigges22/ATLAS/issues/32))。Intel Arc / SYCL 为路线图 (Roadmap) 级别。级别定义见 [SUPPORT_MATRIX.md](../../../SUPPORT_MATRIX.md)。
-- **当前注册表中的模型尚未正式基准测试。** 官方公布的 74.6% LiveCodeBench 分数来自冻结的 14B 参考构建。新的逐模型数据在 [#28](https://github.com/itigges22/ATLAS/issues/28) 中跟踪。参考方法论与消融实验见 [`docs/reports/V3_ABLATION_STUDY.md`](../../reports/V3_ABLATION_STUDY.md)；原始 trace 发布在 [HuggingFace](https://huggingface.co/datasets/itigges22/ATLAS)。
+- **ATLAS 目前没有基准测试结果。** V3.0 的 LiveCodeBench 数字已撤回（见最新动态），当前版本的能力与可靠性数字尚未测量。只有在留出任务上重新测量后才会公布数字；逐模型结果在 [#28](https://github.com/inferstep/ATLAS/issues/28) 中跟踪。
 - **复杂功能添加可能不稳定。** 紧凑模型有时会在陌生代码库上花掉几轮 agent 回合去探索而不是写代码。经过 V3.1.2 的 agent 可靠性加固，可靠性已有提升；最新的逐模型数据在 [#28](https://github.com/itigges22/ATLAS/issues/28) 中跟踪。
 - **语法约束解码速度偏慢。** llama-server 上约 51 tok/s。
 

@@ -567,6 +567,7 @@ func searchFilesTool() *ToolDef {
 
 			var matches []SearchMatch
 			maxMatches := 200
+			skippedCredentials := 0
 
 			err = filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, walkErr error) error {
 				if walkErr != nil {
@@ -577,6 +578,11 @@ func searchFilesTool() *ToolDef {
 					if base == ".git" || base == "node_modules" || base == "__pycache__" || base == ".next" || base == "target" {
 						return filepath.SkipDir
 					}
+					return nil
+				}
+				// A symlink can point outside the workspace. read_file refuses
+				// to follow one, and so does search.
+				if d.Type()&fs.ModeSymlink != 0 {
 					return nil
 				}
 
@@ -594,14 +600,20 @@ func searchFilesTool() *ToolDef {
 					return nil
 				}
 
-				data, err := os.ReadFile(path)
-				if err != nil {
-					return nil
-				}
-
 				relPath, _ := filepath.Rel(ctx.WorkingDir, path)
 				if relPath == "" {
 					relPath = path
+				}
+				// Credential files stay out of model context whichever tool
+				// asks. search_files read them while read_file refused.
+				if denyReadPathReason(relPath) != "" {
+					skippedCredentials++
+					return nil
+				}
+
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return nil
 				}
 
 				scanner := bufio.NewScanner(strings.NewReader(string(data)))
@@ -632,9 +644,10 @@ func searchFilesTool() *ToolDef {
 			}
 
 			out := SearchFilesOutput{
-				Matches:    matches,
-				TotalCount: len(matches),
-				Truncated:  len(matches) >= maxMatches,
+				Matches:                matches,
+				TotalCount:             len(matches),
+				Truncated:              len(matches) >= maxMatches,
+				SkippedCredentialFiles: skippedCredentials,
 			}
 			outBytes, _ := json.Marshal(out)
 			return &ToolResult{Success: true, Data: outBytes}, nil

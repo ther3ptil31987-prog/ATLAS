@@ -268,7 +268,9 @@ type permPrompt struct {
 	message    string
 	toolCallID string
 	sessionID  string
-	args       string // raw args JSON, kept for display
+	// oneTimeOnly: the answer covers this request only (a deletion). The
+	// modal offers no "allow for session", and 'a' allows once.
+	oneTimeOnly bool
 }
 
 // toast is one transient notification. ExpiresAt is checked every tick
@@ -625,7 +627,11 @@ func (m tuiModel) handlePermKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if pp == nil {
 		return m, nil
 	}
-	switch msg.String() {
+	key := msg.String()
+	if key == "a" && pp.oneTimeOnly {
+		key = "y" // a deletion is approved one file at a time
+	}
+	switch key {
 	case "y":
 		m.pendingPerm = nil
 		m.chat = append(m.chat, chatMessage{
@@ -676,7 +682,8 @@ func sortedAllowedTools(allowed map[string]bool) []string {
 	}
 	out := make([]string, 0, len(allowed))
 	for tool, ok := range allowed {
-		if ok {
+		// Never sent for deletions, which the proxy approves per file.
+		if ok && tool != "delete_file" {
 			out = append(out, tool)
 		}
 	}

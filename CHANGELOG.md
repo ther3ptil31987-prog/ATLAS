@@ -4,6 +4,118 @@
 
 ## [Unreleased]
 
+## [3.1.6] - 2026-10-01 — Maia
+
+A security release. It changes nothing else.
+
+### Security: a command behind a prefix or a nested shell skipped the command policy
+
+- The command policy checked the command at the start of the line. A command
+  placed after a prefix, or inside a nested shell or `eval`, was not checked
+  the same way, so a command the policy refuses could still run. The policy
+  now looks through these layers and checks every command they run.
+- A command whose quoting or execution layers cannot be inspected completely
+  is now refused, with a message saying so, instead of allowed.
+- Inspection goes at most 16 layers deep; a command with more is refused.
+- One rarely used form is now refused: `eval` of generated command text with
+  nested quoting. Run the generated command directly instead.
+- Reported and fixed by @Rendegou (GHSA-m9w4-p32x-chx9).
+
+## [3.1.5] - 2026-09-29 — Maia
+
+A security release. It changes nothing else.
+
+### Security: an argument name in another letter case skipped the workspace check
+
+- Tool arguments were checked by their exact names (`path`, `command`), but
+  the tools accepted the same names in any letter case. A call that spelled
+  a name another way, such as `"PATH"`, skipped the workspace check, and in
+  3.1.4 also the command deny-list. Argument names must now be the tools'
+  exact lowercase names; any other spelling is refused before the tool runs.
+- `insert_after`'s path is checked against the workspace when the call is
+  dispatched, like every other write.
+
+## [3.1.4] - 2026-09-27 — Maia
+
+The first release from ATLAS's new home, **inferstep/ATLAS**. It carries the
+security fixes below, the move to the new image owner, and the new
+contributor setup, on top of the changes since 3.1.3 listed further down.
+
+### Security: commands ran without approval, and file search read credential files
+
+- `run_background` started any command without the approval prompt in the
+  default and accept-edits modes, and was checked against a narrower
+  deny-list than `run_command` (`env rm -rf /` and `(rm -rf /)` passed it).
+  Outside yolo, every tool that runs a command now asks, and one command
+  policy covers both. It looks where a command can start: behind `env`,
+  `nohup`, `nice`, `time`, `timeout` or `exec`, in a subshell and in a
+  command substitution. `grep mkfs notes.txt` is no longer refused.
+- `search_files` returned the contents of credential files that
+  `read_file` refuses (`.env`, keys, cloud credentials) and followed
+  symlinks out of the workspace. It now skips both and reports how many
+  credential files it skipped (`skipped_credential_files`). `move_file`
+  refuses to move a credential file to another name, and `insert_after`
+  gets the write deny-list. The rules follow what a tool does, and a test
+  fails when a new tool is outside them. Shell commands are not covered,
+  and the docs now say so.
+- Approval prompts cut a command at 100 characters, so the end of a chain
+  was never shown. The proxy sends the whole command, and
+  `stop_background` names its job.
+- In the TUI, one "allow for session" answer on a deletion approved every
+  later deletion without showing which file, and the proxy honoured
+  `delete_file` in `session_allowed_tools` from any client. Each deletion
+  is now asked about on its own: the TUI never auto-answers or sends a
+  session approval for `delete_file`, the proxy ignores one, and a new
+  session starts with no approvals. The TUI prompt shows the whole
+  command, wrapped; one too long for the screen keeps its first and last
+  lines in view and says how many are not shown.
+- The TUI's chat stream, events stream, raw demo lane and feedback calls
+  never sent the service token, so on an install with one they failed
+  with 401. Every request to the proxy now sends it, ahead of an api-keys
+  token.
+
+### Moved to inferstep/ATLAS
+
+- The repository is now **github.com/inferstep/ATLAS**. Old links, `git`
+  remotes and the install one-liner redirect.
+- Images are published under **ghcr.io/inferstep/atlas-*** and signed by
+  the inferstep/ATLAS build workflow. `ghcr.io/itigges22/atlas-*` stays
+  published for existing installs but gets no new versions.
+- **Existing installs:** re-run the install command, or `git pull` and then
+  `atlas upgrade`. `atlas upgrade`, `atlas config migrate` and a bootstrap
+  re-run move `ATLAS_GHCR_OWNER=itigges22` in `.env` to `inferstep`. A
+  failed upgrade or a rollback puts it back. An install pinned to a
+  release from before the move keeps the old owner until it upgrades, and
+  an owner set in the shell is left alone.
+
+### Fixed
+
+- `golang.org/x/net` in the TUI is now v0.55.0 (GHSA-5cv4-jp36-h3mw).
+
+### Contributors
+
+- New issue forms for bugs, features, tasks, docs, spikes and RFCs, and a
+  fuller pull request template. [CONTRIBUTING](CONTRIBUTING.md) is
+  rewritten as the path from an issue to a release. [GOVERNANCE](GOVERNANCE.md)
+  describes the trust ladder and the RFC flow. New
+  [TRIAGE](docs/TRIAGE.md) and [INCIDENT_RESPONSE](docs/INCIDENT_RESPONSE.md)
+  guides.
+- The public [Roadmap board](https://github.com/orgs/inferstep/projects/1)
+  has a Start Here view. The atlas-bot handles `/claim` and `/unclaim`,
+  reminds and releases stale claims, adds area labels and welcomes
+  newcomers.
+- Pull requests now also need the dependency review and a conventional
+  title check. An OpenSSF Scorecard runs weekly. Dependabot targets `dev`.
+- Releases record a deployment per promotion, and publishing `:latest` or
+  a version tag waits for the release owner's approval.
+
+### Docs
+
+- The V3.0 LiveCodeBench figure (74.6%) is withdrawn. The benchmark runner
+  never ran LiveCodeBench's hidden tests (see the notice in
+  [V3_ABLATION_STUDY](docs/reports/V3_ABLATION_STUDY.md)). The README says
+  ATLAS has no current benchmark result.
+
 ### Measured reliability
 
 A day of running ATLAS against itself and fixing what the sessions showed.
@@ -94,7 +206,7 @@ range.
   fail-soft, no flag.
 - **RPG planning removed everywhere** (it was never shipped in the v3
   image); the A/B on the reference 12B showed no improvement at ~10x
-  planning latency. [#148](https://github.com/itigges22/ATLAS/issues/148)
+  planning latency. [#148](https://github.com/inferstep/ATLAS/issues/148)
   is the record.
 - **V2/TB2 benchmark subgraph and the five superseded trainer scripts
   removed.** The onboarding loop is fully CLI-driven: `atlas bench` →

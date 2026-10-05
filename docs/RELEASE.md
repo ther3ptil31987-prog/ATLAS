@@ -115,12 +115,87 @@ hash status, backend, context size, and service image digests.
 - A supported release cannot be qualified while a required release gate is
   failed or unavailable.
 
-## Release checklist
+## Branches and versions
 
-- Bump the "Applies to" line at the top of
-  [SUPPORT_MATRIX.md](../SUPPORT_MATRIX.md) to the release version.
-- Qualify the release per the verification levels above.
-- Cut and push the signed release tag (next section).
+| Branch | Job | Gets code by | Artifacts |
+|---|---|---|---|
+| `dev` | Integration | Merged pull requests, maintainer pushes | `:dev` and an immutable `:sha-<commit>` image per push |
+| `staging` | Release candidate | Fast-forward from `dev` | `vX.Y.Z-rc.N` tag, RC images |
+| `main` | Released | Fast-forward from `staging` after qualification | Signed `vX.Y.Z` tag, `:latest`, version images |
+
+Contributors always target `dev`. Commits get no version: each one gets an
+immutable `sha-*` image and moves `:dev`. A version is decided at release
+time by what the release contains (semantic versioning):
+
+- any breaking change → **MAJOR**
+- otherwise any `feat` → **MINOR**
+- only fixes → **PATCH**
+
+**Breaking** means a change to a CLI flag, a config key, the API or SSE
+contract, or on-disk state, or dropping a supported backend. Breaking
+changes need an RFC (see [GOVERNANCE](../GOVERNANCE.md#proposals-rfc--adr--epic)).
+
+Image tags drop the `v`: the git tag `v3.2.0` publishes `:3.2.0`,
+`:v3.2.0` and `:3.2`. A release candidate `v3.2.0-rc.1` publishes
+`:3.2.0-rc.1` and `:v3.2.0-rc.1` only, never `:3.2` or `:latest`.
+
+The release notes come from the conventional pull request titles between
+two tags, edited by hand in `CHANGELOG.md`.
+
+## Release rhythm
+
+Minor releases ship **when `dev` is ready**; there's no fixed calendar.
+Patch and security releases ship whenever they're needed. A release
+candidate stays on `staging` for **at least 3 days** before it becomes a
+release.
+
+## Release process
+
+Publishing is gated by the `production` environment
+(`scripts/setup/environments.sh`). Only after the release owner approves
+the waiting deployment does the pipeline move `:latest` or a version tag.
+`dev` pushes deploy to `dev` and release-candidate tags to `staging`,
+without approval. Each promotion leaves a timestamped deployment record.
+
+1. **Notes.** On `dev`, bump the "Applies to" line at the top of
+   [SUPPORT_MATRIX.md](../SUPPORT_MATRIX.md) and write the
+   `CHANGELOG.md` entry.
+2. **Candidate.** Fast-forward `staging` to that `dev` commit
+   (`git push origin dev:staging`). Check out `staging` and run
+   `scripts/release-tag.sh vX.Y.Z-rc.1`. It warns that you're not on
+   `main`; answer `y`, since candidates are tagged on `staging`. Push the
+   tag. See [Signed release tags](#signed-release-tags).
+3. **Test.** Keep the candidate on `staging` for at least 3 days. Qualify
+   it per the verification levels above, on release hardware. A fix found
+   now lands on `dev` and is promoted again as `-rc.2`.
+4. **Release.** Fast-forward `main` to `staging`
+   (`git push origin staging:main`). In the build run for that push,
+   approve the waiting `production` deployment: **Actions → the run →
+   Review deployments → production → Approve**. This moves `:latest`.
+5. **Tag.** Check out `main`, cut and push the signed `vX.Y.Z` tag, then
+   approve the tag build's `production` deployment the same way. This
+   publishes `:X.Y.Z`, `:vX.Y.Z` and `:X.Y`, and `verify-tags` checks the
+   signature.
+6. **Announce** the release (GitHub release, Discussions Announcements).
+
+**Rolling back images.** The `alias` option of `build-images` (run it
+manually from `main`; it also needs `production` approval) repoints every
+service's tag at an earlier one, e.g. `alias_tag: 3.2.0=latest` puts
+`:latest` back on 3.2.0. Nothing is rebuilt.
+
+## Hotfixes
+
+When `dev` isn't releasable and a released version needs a fix:
+
+1. A maintainer branches `hotfix/X.Y.Z` from `main` (only maintainers can
+   create branches) and lands the fix there through a pull request.
+2. Fast-forward `main` to the hotfix branch, approve `production`, and tag
+   `vX.Y.Z` (a patch).
+3. Merge `main` back into `dev` so the next promotion stays a
+   fast-forward. This is the one merge commit `dev` accepts, and the lead
+   makes it as a logged ruleset bypass.
+
+`hotfix/*` is the only branch besides `dev`, `staging` and `main`.
 
 ## Signed release tags
 

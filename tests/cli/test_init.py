@@ -86,7 +86,7 @@ def test_yes_skip_download_writes_env_and_keys(tmp_path, monkeypatch, capsys):
     # Default models_dir is ./models when it equals atlas_root/models.
     assert "ATLAS_MODELS_DIR=./models" in body
     assert "ATLAS_IMAGE_TAG=latest" in body
-    assert "ATLAS_GHCR_OWNER=itigges22" in body
+    assert "ATLAS_GHCR_OWNER=inferstep" in body
     assert "ATLAS_MACOS_PREFIX=~/.atlas/macos" in body
 
 

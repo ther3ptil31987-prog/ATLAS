@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // GH #39 point 4: auto-inject reachability slice. When a user message names
@@ -701,12 +702,16 @@ func validateToolWorkspacePaths(name string, args json.RawMessage, ctx *AgentCon
 	if err := json.Unmarshal(args, &fields); err != nil {
 		return ""
 	}
+	if k := nonCanonicalArgName(fields); k != "" {
+		return fmt.Sprintf("%s: argument names are lowercase, as the tool lists them; %q is not", name, k)
+	}
 	keys := map[string][]string{
 		"read_file":       {"path"},
 		"outline_file":    {"path"},
 		"write_file":      {"path"},
 		"edit_file":       {"path"},
 		"structural_edit": {"path"},
+		"insert_after":    {"path"},
 		"delete_file":     {"path"},
 		"move_file":       {"source", "destination"},
 		"search_files":    {"path"},
@@ -726,6 +731,21 @@ func validateToolWorkspacePaths(name string, args json.RawMessage, ctx *AgentCon
 		}
 		if _, err := resolveWorkspacePath(ctx, value); err != nil {
 			return fmt.Sprintf("%s: %v", name, err)
+		}
+	}
+	return ""
+}
+
+// nonCanonicalArgName is an argument name that is not lowercase ASCII. Every
+// tool field is, and encoding/json matches names case-insensitively, so
+// "PATH" or "ſource" reaches the handler's field while every exact-key
+// reader (this check, the deny-list, the TUI's tool line) sees no such argument.
+func nonCanonicalArgName(fields map[string]json.RawMessage) string {
+	for k := range fields {
+		for _, r := range k {
+			if r > unicode.MaxASCII || unicode.IsUpper(r) {
+				return k
+			}
 		}
 	}
 	return ""

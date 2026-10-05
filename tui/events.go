@@ -279,17 +279,23 @@ func (m *tuiModel) appendChatEvent(ev chatEvent) {
 
 	case "permission_request":
 		var p struct {
-			ToolName   string          `json:"tool_name"`
-			Message    string          `json:"message"`
-			ToolCallID string          `json:"tool_call_id"`
-			Args       json.RawMessage `json:"args"`
+			ToolName    string          `json:"tool_name"`
+			Message     string          `json:"message"`
+			ToolCallID  string          `json:"tool_call_id"`
+			Args        json.RawMessage `json:"args"`
+			OneTimeOnly bool            `json:"one_time_only"`
 		}
 		_ = json.Unmarshal(ev.Data, &p)
+		// A deletion is approved one file at a time: the proxy marks the
+		// request one_time_only, and delete_file is treated so for a proxy
+		// that does not. One "allow for session" used to answer every later
+		// deletion here, without the user seeing which file.
+		oneTime := p.OneTimeOnly || p.ToolName == "delete_file"
 		// A tool already approved "for session" auto-answers allow without
 		// showing the modal, so the user isn't re-prompted for it. The POST
 		// is fire-and-forget (appendChatEvent has no Cmd return path); the
 		// proxy fail-safe still bounds the turn if it never lands.
-		if m.sessionAllowedTools[p.ToolName] {
+		if m.sessionAllowedTools[p.ToolName] && !oneTime {
 			proxyURL := m.proxyURL
 			sid := m.turnSessionID
 			cid := p.ToolCallID
@@ -304,11 +310,11 @@ func (m *tuiModel) appendChatEvent(ev chatEvent) {
 		// Capture the current turn's session id so the decision correlates
 		// to THIS turn on POST /v1/permission.
 		m.pendingPerm = &permPrompt{
-			toolName:   p.ToolName,
-			message:    p.Message,
-			toolCallID: p.ToolCallID,
-			sessionID:  m.turnSessionID,
-			args:       string(p.Args),
+			toolName:    p.ToolName,
+			message:     p.Message,
+			toolCallID:  p.ToolCallID,
+			sessionID:   m.turnSessionID,
+			oneTimeOnly: oneTime,
 		}
 
 	case "permission_denied":

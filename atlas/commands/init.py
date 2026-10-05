@@ -819,8 +819,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="override default <atlas_root>/models")
     parser.add_argument("--image-tag", default="latest",
         help="ATLAS_IMAGE_TAG to write into .env (default: latest)")
-    parser.add_argument("--ghcr-owner", default="itigges22",
-        help="ATLAS_GHCR_OWNER to write into .env (default: itigges22)")
+    parser.add_argument("--ghcr-owner", default="inferstep",
+        help="ATLAS_GHCR_OWNER to write into .env (default: inferstep)")
     parser.add_argument("--backend", default=None,
         choices=["cuda", "rocm", "vulkan", "metal"],
         help="force a specific llama-server backend instead of "
@@ -841,7 +841,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     f"parent directory.{RESET if color else ''}")
         _safe_print("  The wizard writes .env and secrets/ relative to your "
                     "ATLAS checkout. cd into the repo (or clone it: "
-                    "git clone https://github.com/itigges22/ATLAS.git) "
+                    "git clone https://github.com/inferstep/ATLAS.git) "
                     "before re-running.")
         return 1
     models_dir = _resolve_models_dir(args.models_dir, atlas_root)

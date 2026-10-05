@@ -2,7 +2,7 @@
 
 # ATLAS Architecture
 
-System architecture for ATLAS V3.1.3. Two-layer design: an outer agent loop handles tool-call orchestration, and an inner V3 pipeline generates diverse code candidates with build verification and energy-based selection.
+System architecture for ATLAS V3.1.6. Two-layer design: an outer agent loop handles tool-call orchestration, and an inner V3 pipeline generates diverse code candidates with build verification and energy-based selection.
 
 ---
 
@@ -48,7 +48,7 @@ llama-server is the only GPU-using service; every other ATLAS service runs on CP
 |---|---|---|---|---|
 | **CUDA** (NVIDIA) | Supported (since V3.1.0) | `inference/Dockerfile.v31` → `atlas-llama` | (default) | RTX 5060 Ti 16GB (canonical). The published image is compiled for Blackwell (compute capability 12.0/12.1) only; earlier generations need a local rebuild — see [SETUP.md](SETUP.md) |
 | **ROCm / HIP** (AMD) | Community-tested (since V3.1.1) | `inference/Dockerfile.rocm` → `atlas-llama-rocm`, built on the host (`pull_policy: build`; no GHCR image) | `docker-compose.rocm.yml` | RX 7900 XTX (community smoke-test, GH #26) |
-| **Metal** (Apple Silicon) | Supported ([#32](https://github.com/itigges22/ATLAS/issues/32)) | Hybrid: native llama-server (Metal) + Docker for the rest (macOS can't passthrough GPU to containers) | `docker-compose.macos.yml` | M-series; Q4_K_M on ≤16 GB, Q6_K on ≥24 GB unified |
+| **Metal** (Apple Silicon) | Supported ([#32](https://github.com/inferstep/ATLAS/issues/32)) | Hybrid: native llama-server (Metal) + Docker for the rest (macOS can't passthrough GPU to containers) | `docker-compose.macos.yml` | M-series; Q4_K_M on ≤16 GB, Q6_K on ≥24 GB unified |
 | **Vulkan** (cross-vendor fallback) | Preview | `inference/Dockerfile.vulkan` → `atlas-llama-vulkan` | `docker-compose.vulkan.yml` | lavapipe CPU boot path (smoke-tested); no real-GPU validation yet |
 | **SYCL** (Intel Arc) | Roadmap — Intel Arc uses `vulkan` today | TBD | TBD | — |
 
@@ -318,7 +318,7 @@ Legend: blue = generation, green = verification/selection, brown = repair.
 
 **Candidate Allocation: the CxGx gate** (emitted as `phase2` / `phase2_allocated`) decides how many candidates the failed probe earns. The probe's combined C(x)+G(x) score (one embedding extraction, both models) drives a two-step rule: the calibrated C(x) normalized energy picks a base tier on the same ladder Budget Forcing uses, and the G(x) quality score escalates that tier by +1 when it falls below the model's calibrated severe boundary and +2 when it falls well below (0.75x it) — the case where the probe looks cheap to C(x) but wrong to G(x). The tier sets k (`nothink` 1, `standard` 3, `hard` 5, `extreme` 8) under a hard **k >= 3 floor**, so the gate can only add candidates to the previously pinned k=3, never remove them; its worst case is the old behavior. Both signals require this model's calibration files (`cx_normalization.json`, `gx_thresholds.json`): a missing, unreachable, or uncalibrated lens allocates exactly k=3 at `standard`, so an uncalibrated bundle runs the pipeline it ran before rather than routing on a scale that means nothing for it.
 
-The floor is the difference between this and the C(x)-only allocator removed earlier: that one had no floor, so it handed k=1 to tasks whose probe had *just failed* and measured +0.0 pp. Four-arm triangulation at n=175/arm: gated 66.9%, fixed k=3 64.6%, same tier mix shuffled across tasks 61.7%, everything at k=8 67.4% for ~27% more tokens. Beating the shuffled arm by 5.1 pp at matched spend is what says the lens signal carries information rather than the compute alone.
+The floor is the difference between this and the C(x)-only allocator removed earlier: that one had no floor, so it handed k=1 to tasks whose probe had *just failed*. Whether lens-driven allocation beats fixed or randomly assigned tiers is unmeasured. An earlier four-arm comparison (gated, fixed k=3, the same tier mix shuffled across tasks, and k=8, at n=175 per arm) is not evidence either way: it ran on Qwen3.5-9B with a patched runner that is not in this repository, with thinking enabled on escalation, which the live gate cannot apply, on LiveCodeBench tasks the G(x) head was trained on, and at that sample size its arms are within noise of each other.
 
 Live-path difference: the proxy's V3 bridge abandons a pipeline call after `ATLAS_V3_TIMEOUT` (default 180s), a cap the bench never had, so an unbounded escalation to k=8 would spend the budget on generation and return a timeout fallback instead of the k=3 answer the clock could have produced. The live orchestrator therefore passes its remaining wall-clock and the per-call latency observed on that task, and the gate lowers the tier to what the budget can actually generate — reserving one refinement iteration so the escalation cannot starve Phase 3 — never below the floor. The bench runner passes no budget and allocates exactly what was measured. `v3-service/stages/cxgx_gate.py`, shared by both orchestrators.
 

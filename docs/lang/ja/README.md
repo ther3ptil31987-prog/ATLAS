@@ -10,7 +10,7 @@
 <p align="center"><b>Adaptive Test-time Learning and Autonomous Specialization</b></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-V3.1.3-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-V3.1.6-blue" alt="Version"/>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/model-agnostic-green" alt="Model-agnostic"/>
 </p>
@@ -45,7 +45,7 @@
 - **2026-06-17** - **[V3.1.2 "Maia" リリース](https://github.com/itigges22/ATLAS/releases/tag/v3.1.2)** - ハードウェア対応の拡大（ROCm / Metal / Vulkan）、持ち込みモデルの Lens + ASA トレーニング、自分のワークロードからのインザループ lens 再トレーニング、エージェント信頼性の強化
 - **2026-05-12** - **[V3.1.0 "Maia" リリース](https://github.com/itigges22/ATLAS/releases/tag/v3.1.0)** - ネイティブ Bubbletea TUI、ワンコマンドブートストラップ、ストリーミング Lens + ASA 活性化ステアリング、AST 対応の外科的編集
 - **2026-03-26** - [Hacker News フロントページ](https://news.ycombinator.com/item?id=47533297) - 489 ポイント、285 コメント
-- **2026-03-05** - **[V3.0 リリース](../../reports/V3_ABLATION_STUDY.md)** - 凍結された Qwen3-14B で LiveCodeBench pass@1-v(k=3) 74.6%（k=3 の生成候補 + Lens 選択 + 修復を伴う pass@1 であり、単発生成の pass@1 ではありません。[手法の詳細](../../reports/V3_ABLATION_STUDY.md)）
+- **2026-03-05** - **V3.0 リリース** - 凍結された Qwen3-14B 上のマルチフェーズ V3 パイプライン。*このリリースで公表した LiveCodeBench 74.6% は撤回しました。ベンチマークランナーは LiveCodeBench の非公開テストを一度も実行しておらず、3 つの候補のいずれか、または失敗出力を見せた修復が問題文の例に合格すればタスクを合格としていました（[撤回のお知らせ](../../reports/V3_ABLATION_STUDY.md)）。現行製品の再検証後に改めて測定します。*
 - **2026-02-18** - **[V2.0 リリース](../../../CHANGELOG.md)** - ベンチマークインフラ、HumanEval/MBPP/LiveCodeBench/GPQA/SciCode 評価スイート
 
 ## ⭐ Star History
@@ -117,8 +117,8 @@ curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-
 変化し続けるスクリプトをそのまま bash にパイプしたくない場合は、同じインストーラーをより慎重に実行する方法が2つあります:
 ```bash
 # Pinned to a release: script, checkout, and images all at the signed tag
-curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/v3.1.3/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.3 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
 
 # Review before running
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh
@@ -146,7 +146,7 @@ Apple Silicon は macOS ハイブリッド Metal パス（ネイティブ llama-
 ## ⚠️ 既知の制限事項
 
 - **Linux の Docker スタック、加えてネイティブ macOS パス。** NVIDIA (サポート対象 (Supported))、AMD ROCm (コミュニティ検証済み (Community-tested))、Vulkan (プレビュー (Preview)) の Docker パスが現在存在します。Apple Silicon (サポート対象) はネイティブ macOS ハイブリッド Metal パス ([#32](https://github.com/itigges22/ATLAS/issues/32)) で動作します。Intel Arc / SYCL はロードマップ (Roadmap) です。レベルの定義: [SUPPORT_MATRIX.md](../../../SUPPORT_MATRIX.md)。
-- **現行のレジストリモデルはまだ正式にベンチマークされていません。** 公式の 74.6% LiveCodeBench スコアは凍結された 14B リファレンスビルドのものです。モデル別の新しい数値は [#28](https://github.com/itigges22/ATLAS/issues/28) で追跡しています。リファレンスの手法とアブレーションは [`docs/reports/V3_ABLATION_STUDY.md`](../../reports/V3_ABLATION_STUDY.md) に、生トレースは [HuggingFace](https://huggingface.co/datasets/itigges22/ATLAS) に公開しています。
+- **ATLAS には現在のベンチマーク結果がありません。** V3.0 の LiveCodeBench の数値は撤回しました（最新ニュース参照）。現行リリースの能力・信頼性の数値はまだ測定されていません。数値は保留タスクでの再測定後にのみ公表し、モデル別の結果は [#28](https://github.com/itigges22/ATLAS/issues/28) で追跡します。
 - **複雑な機能追加は不安定なことがあります。** コンパクトなモデルは、コードを書き始める前に不慣れなコードベースの探索にエージェントターンを費やすことがあります。信頼性は V3.1.2 のエージェント信頼性強化で改善しています。モデル別の最新の数値は [#28](https://github.com/itigges22/ATLAS/issues/28) で追跡しています。
 - **文法制約デコーディングは遅め。** llama-server で約 51 tok/s。
 
