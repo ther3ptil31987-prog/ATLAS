@@ -437,10 +437,11 @@ chcon -Rt svirt_sandbox_file_t ~/models/
 
 **증상:** 프록시 헬스에 `"sandbox": false`가 표시됩니다. V3 빌드 검증이 실패합니다.
 
-**해결:** 모든 서비스가 동일한 Docker 네트워크에 있는지 확인하세요. Docker Compose는 `atlas` 네트워크를 자동으로 생성합니다. 컨테이너를 수동으로 실행하는 경우:
+**해결:** 샌드박스는 `atlas`가 아니라 `sandbox-net`을 통해 접근합니다 — 실행된 코드가 나머지 스택에 닿을 수 없도록, 샌드박스는 의도적으로 `atlas` 네트워크에 속하지 않는 유일한 서비스입니다. 프록시, 렌즈, v3-service는 두 네트워크에 모두 연결됩니다. 컨테이너를 수동으로 실행하는 경우:
 ```bash
-docker network create atlas
-# Start all containers with --network atlas
+docker network create sandbox-net
+# sandbox joins ONLY sandbox-net; proxy / lens / v3-service join it too,
+# in addition to the atlas network.
 ```
 
 ### 포트 충돌

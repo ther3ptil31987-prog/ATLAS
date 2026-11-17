@@ -2,7 +2,7 @@
 
 # ATLAS Architecture
 
-System architecture for ATLAS V3.1.6. Two-layer design: an outer agent loop handles tool-call orchestration, and an inner V3 pipeline generates diverse code candidates with build verification and energy-based selection.
+System architecture for ATLAS V3.1.7. Two-layer design: an outer agent loop handles tool-call orchestration, and an inner V3 pipeline generates diverse code candidates with build verification and energy-based selection.
 
 ---
 
@@ -85,19 +85,20 @@ The K3s deployment path (`scripts/install.sh`, manifests in `templates/`) is CUD
 
 The proxy is the entry point for chat front-ends. It accepts user messages on `/v1/agent` (typed event stream — what the TUI uses) and runs an internal agent loop that calls llama-server, parses tool calls, executes them, and streams events back. The `/v1/chat/completions` endpoint is a transparent passthrough to llama-server; it is kept for SDK compatibility and does not run the agent loop. See [API.md](API.md) for the full event-type catalogue.
 
-The proxy is 12 Go files, one concern each:
+The proxy is 13 Go files, one concern each:
 
 | File | Owns |
 |---|---|
 | `main.go` | HTTP server, routes, auth, passthrough, error envelope, private-value log filter |
 | `agent.go` | The agent loop: turn state, LLM calls, plan generation, pattern-context injection, stuck-loop breakers |
-| `tools.go` | The 14 tool definitions + executors, tier classification, tool-call grammar |
+| `tools.go` | The 15 tool definitions + executors, tier classification, tool-call grammar |
 | `gates.go` | Honesty/plan gates: claim-check, structural, syntax, embedded-script, plan-adherence, plan-reminder, asset lint |
 | `detectors.go` | Stuck-pattern detectors: tool repetition, reasoning repetition, traceback localization |
 | `context.go` | Context enrichment: symbol index, project scan, workspace containment, session file manifest |
 | `permissions.go` | Permission gate (`/v1/permission`), trust mode, hard-blocked patterns |
 | `lens.go` | Lens scoring calls, lens-sample banking (`/feedback`), calibration status |
 | `guardrails.go` | Per-tool steering guards (shrinkage, missing-command/module steers, doctype strip) |
+| `shell_wrapper.go` | The command policy behind `validateShellCommand`: splits compound commands, looks inside execution wrappers (`sh -c`, `eval`, …) up to 16 layers deep, refuses catastrophic commands and wrappers it cannot check |
 | `events.go` | Typed-envelope broker (`/events`) and SSE plumbing |
 | `v3_bridge.go` | SSE client for v3-service `/v3/generate` + `/v3/plan` |
 | `types.go` | Shared types, tiers, turn caps |

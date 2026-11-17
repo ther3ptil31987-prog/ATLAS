@@ -94,7 +94,10 @@ services:
     restart: unless-stopped
     build:
       context: ./geometric-lens
+    # The installing user's ids, written by `atlas init`; all four services run as that user.
+    user: "${ATLAS_PROXY_UID:-1000}:${ATLAS_PROXY_GID:-1000}"
     environment:
+      - HOME=/tmp
       - LLAMA_URL=http://llama-server:8080
       - LLAMA_EMBED_URL=http://llama-server:8080
       - ATLAS_MODEL_NAME=${ATLAS_MODEL_NAME:?Set ATLAS_MODEL_NAME in .env or run atlas init}
@@ -147,7 +150,10 @@ services:
     build:
       context: .
       dockerfile: v3-service/Dockerfile
+    # The installing user's ids, written by `atlas init`; all four services run as that user.
+    user: "${ATLAS_PROXY_UID:-1000}:${ATLAS_PROXY_GID:-1000}"
     environment:
+      - HOME=/tmp
       - ATLAS_INFERENCE_URL=http://llama-server:8080
       - ATLAS_LENS_URL=http://geometric-lens:8099
       - ATLAS_SANDBOX_URL=http://sandbox:8020
@@ -332,6 +338,7 @@ services:
       # Security + observability knobs read in-container; without these
       # passthroughs a .env setting silently does nothing (doc-audit fix).
       - ATLAS_TRUST_MODE=${ATLAS_TRUST_MODE:-}
+      - ATLAS_ALLOWED_ORIGINS=${ATLAS_ALLOWED_ORIGINS:-}
       - ATLAS_LOG_FORMAT=${ATLAS_LOG_FORMAT:-}
       - ATLAS_ALLOW_CREDENTIAL_READS=${ATLAS_ALLOW_CREDENTIAL_READS:-}
       - ATLAS_PERMISSION_TIMEOUT_SEC=${ATLAS_PERMISSION_TIMEOUT_SEC:-}
@@ -365,8 +372,9 @@ services:
       # PC-192: opt-in host execution for run_command. Set to "host"
       # to bypass the sandbox container and run verifications on the
       # host (works when proxy runs locally, not in Docker — Docker
-      # proxy can only see its own container fs). Per-project override
-      # via /workspace/.atlas/config.toml [execution] target=host.
+      # proxy can only see its own container fs). It needs
+      # ATLAS_TRUST_MODE=fully-trusted too; a workspace's
+      # .atlas/config.toml may choose only the sandbox.
       - ATLAS_VERIFY_IN=${ATLAS_VERIFY_IN:-sandbox}
       # PC-200: turn cap override. Tier defaults: T0=5, T1-T3 uncapped
       # (the error-loop breaker and done-gates bound runaway turns). Set

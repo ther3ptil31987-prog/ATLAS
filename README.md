@@ -7,7 +7,7 @@
 <p align="center"><b>Adaptive Test-time Learning and Autonomous Specialization</b></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-V3.1.6-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-V3.1.7-blue" alt="Version"/>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/model-agnostic-green" alt="Model-agnostic"/>
 </p>
@@ -47,6 +47,7 @@
 
 ## 📰 Latest News
 
+- **2026-10-24** - **[V3.1.7 "Maia" released](https://github.com/inferstep/ATLAS/releases/tag/v3.1.7)** - security fixes for the service token, the proxy's file reads, the TUI's terminal output, the tool-call path check, where commands run, rollback signatures, the lens check's file loading and the proxy's requests, and installer fixes ([advisories](https://github.com/inferstep/ATLAS/security/advisories)). Please upgrade.
 - **2026-10-01** - **[V3.1.6 "Maia" released](https://github.com/inferstep/ATLAS/releases/tag/v3.1.6)** - security fix for the command policy ([GHSA-m9w4-p32x-chx9](https://github.com/inferstep/ATLAS/security/advisories/GHSA-m9w4-p32x-chx9), reported and fixed by [@Rendegou](https://github.com/Rendegou)). Please upgrade.
 - **2026-09-29** - **[V3.1.5 "Maia" released](https://github.com/inferstep/ATLAS/releases/tag/v3.1.5)** - security fix for tool argument names ([GHSA-c3p6-m657-h629](https://github.com/inferstep/ATLAS/security/advisories/GHSA-c3p6-m657-h629)). Please upgrade.
 - **2026-09-27** - **[V3.1.4 "Maia" released](https://github.com/inferstep/ATLAS/releases/tag/v3.1.4)** - the move to inferstep/ATLAS, security fixes ([GHSA-5hvw-59r4-7rcq](https://github.com/inferstep/ATLAS/security/advisories/GHSA-5hvw-59r4-7rcq)), and the contributor setup.
@@ -125,8 +126,8 @@ curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-
 Prefer not to pipe a moving script into bash? Same installer, two more careful ways to run it:
 ```bash
 # Pinned to a release: script, checkout, and images all at the signed tag
-curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.7/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.7 bash
 
 # Review before running
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh
@@ -156,9 +157,9 @@ Apple Silicon runs natively through the macOS hybrid Metal path (native llama-se
 - **Linux Docker stack, plus a native macOS path.** NVIDIA (Supported), AMD ROCm (Community-tested), and Vulkan (Preview) Docker paths exist today; Apple Silicon (Supported) runs via the native macOS hybrid Metal path ([#32](https://github.com/inferstep/ATLAS/issues/32)). Intel Arc / SYCL is Roadmap. Level definitions: [SUPPORT_MATRIX.md](SUPPORT_MATRIX.md).
 - **ATLAS has no current benchmark result.** The V3.0 LiveCodeBench figure is withdrawn (see Latest News), and no capability or reliability figure has been measured for the current release. Numbers will be published only after a re-measurement on held-out tasks; model-specific results are tracked in [#28](https://github.com/inferstep/ATLAS/issues/28).
 - **Known issues in 3.1.x (fixes planned for 3.2.0).** Review what ATLAS writes and run your project's own tests before you rely on a "done".
-  - **A failing V3 candidate can be written as verified (3.1.0 to 3.1.6).** When the V3 pipeline handles an edit and no candidate passes its tests, even after repair, ATLAS writes the best-scoring candidate anyway and tells the agent the edit was verified. The fix is on `dev` ([e8112d3](https://github.com/inferstep/ATLAS/commit/e8112d3)).
-  - **C, C++, Swift, JSX, Vue and Svelte files are checked as Python (3.1.6).** V3 handles these files but tests their candidates as Python, so the candidates fail, and the issue above then applies.
-  - **The lens gives no usable signal (3.1.3 to 3.1.6).** It reports `calibrated` and `interventions active`, but with the default settings its per-token scoring cannot run, so it cannot veto a candidate or raise an alert, and its scores barely change between inputs, so V3 always gets three candidates. The calibration files in the repository were also fit to a different cost field than the published one ([#281](https://github.com/inferstep/ATLAS/issues/281)).
+  - **A failing V3 candidate can be written as verified (3.1.0 to 3.1.7).** When the V3 pipeline handles an edit and no candidate passes its tests, even after repair, ATLAS writes the best-scoring candidate anyway and tells the agent the edit was verified. The fix is on `dev` ([e8112d3](https://github.com/inferstep/ATLAS/commit/e8112d3)).
+  - **C, C++, Swift, JSX, Vue and Svelte files are checked as Python (3.1.6 and 3.1.7).** V3 handles these files but tests their candidates as Python, so the candidates fail, and the issue above then applies.
+  - **The lens gives no usable signal (3.1.3 to 3.1.7).** It reports `calibrated` and `interventions active`, but with the default settings its per-token scoring cannot run, so it cannot veto a candidate or raise an alert, and its scores barely change between inputs, so V3 always gets three candidates. The calibration files in the repository were also fit to a different cost field than the published one ([#281](https://github.com/inferstep/ATLAS/issues/281)).
 - **Complex feature additions can be inconsistent.** Compact models sometimes spend agent turns exploring an unfamiliar codebase before writing code.
 - **Grammar-constrained decoding is slower than unconstrained decoding.**
 

@@ -117,8 +117,8 @@ pipe a moving `main` script into bash):
 # Pinned to a release: fetch the script AT the tag and install that tag.
 # The checkout is pinned to the (SSH-signed) tag and ATLAS_IMAGE_TAG is
 # pinned to the matching cosign-signed images.
-curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.7/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.7 bash
 
 # Review before running: download, read, then execute the same bytes.
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/inferstep/ATLAS/main/scripts/atlas-bootstrap.sh
@@ -140,7 +140,11 @@ bash atlas-bootstrap.sh
 | `ATLAS_BOOTSTRAP_REF=vX.Y.Z` | Pin the install to a git tag/sha instead of tracking `main`; a `vX.Y.Z` value also pins `ATLAS_IMAGE_TAG` to the matching images |
 | `ATLAS_INSTALL_DIR=/path` | Where to clone (default `/opt/atlas` — see below) |
 | `ATLAS_REPO_URL=https://...` | Alternate repo URL |
-| `ATLAS_GO_VERSION=1.26.2` | Go toolchain version installed for the TUI build (the TUI needs 1.26.2+; older installed toolchains auto-fetch it) |
+| `ATLAS_GO_VERSION=1.26.10` | Go toolchain version installed for the TUI build (the TUI needs 1.26.10+; older installed toolchains auto-fetch it) |
+| `ATLAS_DOWNLOAD_TRIES=3` | How often a download that fails is tried before the install stops (the pip downloads and the Go module download) |
+| `ATLAS_DOWNLOAD_WAIT_SECONDS=5` | The wait between two tries of a download |
+
+**Downloads and logs.** The installer keeps its downloads and logs in a private temporary folder that it makes for the run. An install that passed removes the folder at the end. When the install failed, or a step warned and named its log, the folder is kept, and the last line of the output gives its path.
 
 **Why `/opt/atlas`?** It's the standard FHS prefix for system-wide third-party software, survives `$HOME` cleanup, and lets multiple users on the same box share one install. If you'd rather it land in your home dir:
 
@@ -232,13 +236,13 @@ case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *)
 # 3. Select/install a model and write model-aware runtime sizing
 atlas init
 
-# 4. Install Go 1.26.2+ — required for the TUI client (atlas tui) and
+# 4. Install Go 1.26.10+ — required for the TUI client (atlas tui) and
 #    optional for the proxy (proxy builds automatically on first run if Go
 #    is present; otherwise it runs in Docker with file access limited to
 #    ATLAS_PROJECT_DIR). Quickest path:
 mkdir -p /tmp/go-install && cd /tmp/go-install
-curl -LO https://go.dev/dl/go1.26.2.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.2.linux-amd64.tar.gz
+curl -LO https://go.dev/dl/go1.26.10.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.10.linux-amd64.tar.gz
 echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 cd -
@@ -455,8 +459,8 @@ The checks:
 | Host | tier_match | `.env` model selection matches host hardware (warn on overshoot — OOM risk — pass on match or undershoot) |
 | Host | tier_constraints | host CPU/RAM/disk meets the recommended tier minimums (catches "16 GB GPU but 8 GB RAM" mismatches) |
 | Stack | container/llama-server, geometric-lens, v3-service, sandbox, atlas-proxy | all 5 running and healthy |
-| Stack | health/llama, lens, v3, sandbox, proxy | all 5 `/health` endpoints return ok |
-| Stack | internal_auth | internal service auth: token file present with tight permissions, and live enforcement probed both ways (wrong token → 401, valid token accepted); warns when auth is disabled (no `secrets/service-token`) |
+| Stack | health/llama, lens, v3, sandbox, proxy | the `/health` endpoints return ok; for the lens, the strict `/ready` (scoring works), and when not, the reason it gives |
+| Stack | internal_auth | internal service auth: token file present with tight permissions and readable by the user the services run as, and live enforcement probed both ways at each of the proxy, the lens, the V3 service and the sandbox (wrong token → 401, valid token accepted); warns when auth is disabled (no `secrets/service-token`) |
 | Stack | status_dimensions | informational: the seven lens/ASA status dimensions from the proxy `/v1/calibration/status` (the same source the TUI badge reads); never fails the run |
 | Stack | sqlite_state | lens `/health` reports the SQLite state store available (`subsystems.sqlite`) |
 | Stack | image_skew | all 5 `atlas-*` images on the same tag |
@@ -529,7 +533,10 @@ rm -rf ~/.cache/atlas-tui          # TUI session history
 ```
 
 K3s installs use `scripts/uninstall.sh` instead, which tears down the
-manifests and (optionally) the K3s node itself.
+manifests and (optionally) the K3s node itself. With `--data` it also
+removes the data folder and the projects folder, where your own projects
+are; with `--models`, the model files. Before it asks, it lists each folder
+that it will remove, with its path.
 
 ---
 
@@ -541,7 +548,7 @@ Run all services as local processes without containers. Useful for development o
 
 | Requirement | Details |
 |-------------|---------|
-| **Go 1.26.2+** | For building atlas-proxy and the atlas-tui client (older Go toolchains auto-fetch it) |
+| **Go 1.26.10+** | For building atlas-proxy and the atlas-tui client (older Go toolchains auto-fetch it) |
 | **llama.cpp** | Built from source with CUDA (see [llama.cpp build instructions](https://github.com/ggml-org/llama.cpp?tab=readme-ov-file#build)) |
 | **Node.js 20+** | Required by sandbox for JavaScript/TypeScript execution |
 | **Rust** | Required by sandbox for Rust execution |
@@ -626,13 +633,15 @@ cd /path/to/your/project
 atlas    # Checks atlas-proxy is reachable, then launches the TUI
 ```
 
-`atlas` builds the `atlas-tui` binary from `tui/` automatically if it is missing or older than the checkout (requires Go 1.26.2+ on PATH), and verifies the proxy on localhost:8090 before handing over to the TUI.
+`atlas` builds the `atlas-tui` binary from `tui/` automatically if it is missing or older than the checkout (requires Go 1.26.10+ on PATH), and verifies the proxy on localhost:8090 before handing over to the TUI.
 
 ---
 
 ## Method 3: K3s
 
 Kubernetes deployment with GPU scheduling, health probes, and resource limits. Preview — templates are validated and rendered in CI; there is no automated live-cluster test.
+
+> **Network exposure.** This method publishes all five services as NodePorts (defaults `30080`, `32735`, `31144`, `30070`, `30820`). A NodePort answers on every network address of the node, not only on `127.0.0.1`, so other machines on the same network can reach the services. The K3s templates do not mount the service token, so no service checks a token on this method. Use this method only on a network you trust, or close these ports to other machines with the host firewall. The Docker Compose method binds every published port to `127.0.0.1`.
 
 ### Additional Prerequisites
 

@@ -10,7 +10,7 @@
 <p align="center"><b>Adaptive Test-time Learning and Autonomous Specialization</b></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-V3.1.6-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-V3.1.7-blue" alt="Version"/>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License"/>
   <img src="https://img.shields.io/badge/model-agnostic-green" alt="模型无关"/>
 </p>
@@ -117,8 +117,8 @@ curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-
 不想把一个随 `main` 变动的脚本直接管道进 bash？还是同一个安装器，另有两种更稳妥的运行方式：
 ```bash
 # Pinned to a release: script, checkout, and images all at the signed tag
-curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.7/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.7 bash
 
 # Review before running
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh

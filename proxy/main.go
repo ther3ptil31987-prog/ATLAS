@@ -20,10 +20,13 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -65,25 +68,23 @@ func envOr(key, fallback string) string {
 // resolveVerifyTarget returns "host" when run_command should bypass
 // the sandbox and execute on the host, or "sandbox" otherwise.
 //
-// Resolution order (later wins):
-//  1. ATLAS_VERIFY_IN env var ("host" or "sandbox")
-//  2. Per-project .atlas/config.toml — looks for `target = "host"` or
-//     `target = "sandbox"` under an [execution] header. Trivially
-//     parsed (no real TOML lib) so we don't take a dep just for one
-//     setting; refuse to be clever about quoting.
+// Only the operator chooses the host: ATLAS_VERIFY_IN=host together with
+// ATLAS_TRUST_MODE=fully-trusted. The workspace's .atlas/config.toml may
+// choose the sandbox with `target = "sandbox"` under an [execution]
+// header, but not the host, because the files of a workspace are not the
+// operator's choice. A file that names the host is ignored, with a log
+// line. The file is parsed by hand (no TOML library) for this one setting.
 //
-// Default: "sandbox" (the safer path). Per-project config is the
-// usual customization point for working codebases that need host
-// execution; the env var is for one-off sessions and CI.
+// Default: "sandbox".
 func resolveVerifyTarget(workingDir string) string {
-	target := strings.ToLower(os.Getenv("ATLAS_VERIFY_IN"))
-	if target != "host" && target != "sandbox" {
-		target = "sandbox"
+	target := "sandbox"
+	if strings.ToLower(envOr("ATLAS_VERIFY_IN", "")) == "host" && resolveTrustMode().hostExecutionAllowed() {
+		target = "host"
 	}
 	if workingDir == "" {
 		return target
 	}
-	cfg, err := os.ReadFile(filepath.Join(workingDir, ".atlas", "config.toml"))
+	cfg, err := readConfined(workingDir, filepath.Join(".atlas", "config.toml"))
 	if err != nil {
 		return target
 	}
@@ -105,8 +106,13 @@ func resolveVerifyTarget(workingDir string) string {
 			continue
 		}
 		val := strings.ToLower(strings.Trim(strings.TrimSpace(parts[1]), `"'`))
-		if val == "host" || val == "sandbox" {
-			return val
+		if val == "sandbox" {
+			return "sandbox"
+		}
+		if val == "host" {
+			log.Printf("[execution] .atlas/config.toml names target = \"host\"; ignored: " +
+				"only the operator chooses the host, with ATLAS_VERIFY_IN=host and ATLAS_TRUST_MODE=fully-trusted")
+			return target
 		}
 	}
 	return target
@@ -351,7 +357,7 @@ func main() {
 	log.SetOutput(filteringWriter{w: out})
 
 	addr := ":" + proxyPort
-	log.Printf("ATLAS Proxy v3.1.6 starting on %s", addr)
+	log.Printf("ATLAS Proxy v3.1.7 starting on %s", addr)
 	log.Printf("  Inference: %s", inferenceURL)
 	log.Printf("  Geometric Lens: %s", lensURL)
 	log.Printf("  Sandbox: %s", sandboxURL)
@@ -373,7 +379,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           http.MaxBytesHandler(withRequestID(requireServiceToken(newProxyMux())), maxRequestBodyBytes),
+		Handler:           newServerHandler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       90 * time.Second,
@@ -469,6 +475,15 @@ func requestIDFromContext(ctx context.Context) string {
 		return v
 	}
 	return ""
+}
+
+// newServerHandler is the proxy's handler as the server runs it: the routes,
+// which take only requests of the form the clients send, behind the check of
+// the service token, each request with its id, and no body over
+// maxRequestBodyBytes.
+func newServerHandler() http.Handler {
+	routes := acceptOnlyJSONFromClients(newProxyMux())
+	return http.MaxBytesHandler(withRequestID(requireServiceToken(routes)), maxRequestBodyBytes)
 }
 
 // withRequestID wraps a handler so every request carries a correlation
@@ -579,11 +594,27 @@ func loadServiceToken() string {
 	if path == "" {
 		path = "/run/atlas-secrets/service-token"
 	}
-	data, err := os.ReadFile(path)
+	token, err := readServiceToken(path)
 	if err != nil {
-		return "" // unconfigured => auth disabled (doctor warns)
+		log.Fatal(err)
 	}
-	return strings.TrimSpace(string(data))
+	return token
+}
+
+// readServiceToken reads the token file. A file that is not there is no
+// token: auth disabled (doctor warns). A file that is there but cannot be
+// read is an error: without a token the proxy would check nothing, so it
+// stops and says why.
+func readServiceToken(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("the service token file %s cannot be read (%w), so the proxy stops rather than "+
+			"run with no check. It runs as user %d: make the file readable for that user", path, err, os.Getuid())
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 // authOpenPaths never require the token: health probes are headerless
@@ -623,10 +654,10 @@ func requireServiceToken(next http.Handler) http.Handler {
 	})
 }
 
-// tokenTransport injects the service token into outbound requests
-// (proxy -> llama/v3/lens/sandbox) unless the caller already set an
-// Authorization header (e.g. the /v1/chat passthrough forwarding a
-// client's own header).
+// tokenTransport injects the service token into outbound requests to the
+// stack's own services (proxy -> llama/v3/lens/sandbox, see isStackAddress)
+// unless the caller already set an Authorization header (e.g. the /v1/chat
+// passthrough forwarding a client's own header).
 type tokenTransport struct {
 	base http.RoundTripper
 }
@@ -639,7 +670,7 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		req = req.Clone(req.Context())
 		req.Header.Set(requestIDHeader, id)
 	}
-	if serviceToken != "" && req.Header.Get("Authorization") == "" {
+	if serviceToken != "" && req.Header.Get("Authorization") == "" && isStackAddress(req.URL) {
 		req = req.Clone(req.Context())
 		req.Header.Set("Authorization", "Bearer "+serviceToken)
 	}
@@ -648,6 +679,33 @@ func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		base = http.DefaultTransport
 	}
 	return base.RoundTrip(req)
+}
+
+// isStackAddress says whether a request goes to one of the services that the
+// proxy is configured to call: same scheme, host and port. Only those get the
+// service token. The transport sees each step of a redirect as a request of
+// its own, so a redirect to any other address gets no token either.
+func isStackAddress(u *url.URL) bool {
+	stack := []string{inferenceURL, lensURL, sandboxURL, v3URL, envOr("ATLAS_LLAMA_URL", inferenceURL)}
+	for _, address := range stack {
+		configured, err := url.Parse(address)
+		if err == nil && strings.EqualFold(configured.Scheme, u.Scheme) &&
+			strings.EqualFold(configured.Hostname(), u.Hostname()) && portOf(configured) == portOf(u) {
+			return true
+		}
+	}
+	return false
+}
+
+// portOf is the port of an address, also when the address leaves it out.
+func portOf(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
 
 // installTokenTransport wires outbound injection through the two

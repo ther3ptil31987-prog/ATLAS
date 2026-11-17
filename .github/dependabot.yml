@@ -3,7 +3,9 @@ version: 2
 # updates always target the default branch (main) and are retargeted by hand.
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    # "/" is the workflows. The pins inside the composite actions of
+    # .github/actions are not read from there, so their folders are named.
+    directories: ["/", "/.github/actions/*"]
     target-branch: dev
     schedule:
       interval: weekly
@@ -12,7 +14,12 @@ updates:
         patterns: ["*"]
 
   - package-ecosystem: pip
-    directory: /
+    # /.github/requirements holds CI's hashed lock (ci.in and ci.txt). Some
+    # pins of ci.in are copies of pins in the sandbox and v3-service files
+    # (a contract test holds them the same), so both folders sit in the same
+    # group: one pull request then moves a pin in both places and makes the
+    # lock again.
+    directories: ["/", "/.github/requirements"]
     target-branch: dev
     schedule:
       interval: weekly
@@ -23,7 +30,12 @@ updates:
       # setuptools >=83 requires python >=3.10, but RHEL9-family hosts
       # (a supported bootstrap target) build the CLI from pyproject on
       # system python 3.9. Revisit when the py3.9 floor is dropped.
-      - dependency-name: "setuptools" 
+      - dependency-name: "setuptools"
+      # torch is pinned twice per service: requirements.txt and the
+      # Dockerfile's CPU-only pre-install, which must match
+      # (tests/contracts/test_torch_cpu_pin.py). Dependabot can bump only
+      # the first, so torch is bumped by hand in both places.
+      - dependency-name: "torch"
 
   - package-ecosystem: gomod
     directory: /proxy
@@ -41,6 +53,20 @@ updates:
       interval: weekly
     groups:
       go:
+        patterns: ["*"]
+
+  # The JetBrains plugin is its own Gradle build under extensions/jetbrains.
+  # The IntelliJ Platform Gradle Plugin and the IntelliJ Platform version are
+  # pinned in the build and stay hand-managed: bumping the platform is a
+  # compatibility decision (sinceBuild, Kotlin API level), not a routine
+  # bump.
+  - package-ecosystem: gradle
+    directory: /extensions/jetbrains
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      gradle:
         patterns: ["*"]
 
   - package-ecosystem: docker

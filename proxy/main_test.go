@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -183,6 +185,46 @@ func TestPassthroughRejectsOversizedBody(t *testing.T) {
 	}
 }
 
+// The clients send each POST as application/json and no Origin header, as in
+// the first row; the server refuses a POST of another type, and a request
+// from a web page unless the operator put its origin on the list.
+func TestTheServerTakesOnlyRequestsOfTheFormItsClientsSend(t *testing.T) {
+	defer withToken(t, "")()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(upstream.Close)
+	withInferenceURL(t, upstream.URL)
+	for _, c := range []struct {
+		name, method, path, contentType, origin, allowedOrigins string
+		want                                                    int
+	}{
+		{"a POST as the clients send it", http.MethodPost, "/v1/chat/completions", "application/json", "", "", http.StatusOK},
+		{"JSON with a charset", http.MethodPost, "/v1/chat/completions", "application/json; charset=utf-8", "", "", http.StatusOK},
+		{"a GET with no type", http.MethodGet, "/version", "", "", "", http.StatusOK},
+		{"a POST of plain text", http.MethodPost, "/v1/chat/completions", "text/plain", "", "", http.StatusUnsupportedMediaType},
+		{"a POST with no type", http.MethodPost, "/v1/chat/completions", "", "", "", http.StatusUnsupportedMediaType},
+		{"an origin, with the list empty as by default", http.MethodPost, "/v1/chat/completions", "application/json", "http://localhost:3000", "", http.StatusForbidden},
+		{"an origin on the list", http.MethodPost, "/v1/chat/completions", "application/json", "http://localhost:3000", "http://other.test, http://localhost:3000", http.StatusOK},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("ATLAS_ALLOWED_ORIGINS", c.allowedOrigins)
+			req := httptest.NewRequest(c.method, c.path, strings.NewReader("{}"))
+			if c.contentType != "" {
+				req.Header.Set("Content-Type", c.contentType)
+			}
+			if c.origin != "" {
+				req.Header.Set("Origin", c.origin)
+			}
+			rec := httptest.NewRecorder()
+			newServerHandler().ServeHTTP(rec, req)
+			if rec.Code != c.want {
+				t.Fatalf("status = %d, want %d; body=%q", rec.Code, c.want, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestWriteErrorEnvelope(t *testing.T) {
 	rec := httptest.NewRecorder()
 	writeError(rec, 400, ErrInvalidInput, "bad thing")
@@ -298,6 +340,7 @@ func TestTokenTransportInjection(t *testing.T) {
 			gotAuth = r.Header.Get("Authorization")
 		}))
 	defer srv.Close()
+	withInferenceURL(t, srv.URL)
 
 	client := &http.Client{Transport: &tokenTransport{}}
 
@@ -325,6 +368,44 @@ func TestTokenTransportInjection(t *testing.T) {
 			t.Fatalf("caller header overridden: %q", gotAuth)
 		}
 	})
+}
+
+func TestTokenTransportSendsTheTokenOnlyToAnAddressOfTheStack(t *testing.T) {
+	defer withToken(t, "atlas-st-inject")()
+	got := map[string]string{} // the Authorization that each stand-in got, by stand-in and path
+	other := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			got["other"+r.URL.Path] = r.Header.Get("Authorization")
+		}))
+	defer other.Close()
+	stack := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			got["stack"+r.URL.Path] = r.Header.Get("Authorization")
+			if r.URL.Path == "/moved" {
+				http.Redirect(w, r, other.URL+"/after-the-redirect", http.StatusFound)
+			}
+		}))
+	defer stack.Close()
+	// Only the stand-in "stack" is an address of the stack. The other one is on the same host, on another port.
+	withInferenceURL(t, stack.URL)
+
+	client := &http.Client{Transport: &tokenTransport{}}
+	for _, address := range []string{stack.URL + "/asked", other.URL + "/asked", stack.URL + "/moved"} {
+		resp, err := client.Get(address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	want := map[string]string{
+		"stack/asked":              "Bearer atlas-st-inject",
+		"other/asked":              "",
+		"stack/moved":              "Bearer atlas-st-inject",
+		"other/after-the-redirect": "",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("the token went to\n%v\nwant\n%v", got, want)
+	}
 }
 
 func TestWithRequestIDGenerates(t *testing.T) {
@@ -356,6 +437,32 @@ func TestWithRequestIDHonorsClientID(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if seen != "req-client-supplied" {
 		t.Fatalf("client id not honored: %q", seen)
+	}
+}
+
+func TestReadServiceTokenStopsOnAFileThatIsThereButCannotBeRead(t *testing.T) {
+	dir := t.TempDir()
+	if token, err := readServiceToken(filepath.Join(dir, "not-there")); token != "" || err != nil {
+		t.Fatalf("a file that is not there: %q, %v; want no token and no error", token, err)
+	}
+	readable := filepath.Join(dir, "readable")
+	if err := os.WriteFile(readable, []byte("atlas-st-inject\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if token, err := readServiceToken(readable); token != "atlas-st-inject" || err != nil {
+		t.Fatalf("a file that can be read: %q, %v; want its token", token, err)
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a file of mode 000, so the case of a file that cannot be read needs a user that is not root")
+	}
+	unreadable := filepath.Join(dir, "service-token")
+	if err := os.WriteFile(unreadable, []byte("atlas-st-inject\n"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	_, err := readServiceToken(unreadable)
+	want := "the service token file " + unreadable + " cannot be read"
+	if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, os.ErrPermission) {
+		t.Fatalf("a file that cannot be read: %v; want an error that says %q", err, want)
 	}
 }
 

@@ -3,7 +3,7 @@
 
 # ATLAS 架构
 
-ATLAS V3.1.6 的系统架构。采用双层设计：外层 agent 循环负责工具调用的编排，内层 V3 pipeline 则生成多样化的代码候选，并配合构建验证与基于能量的选择。
+ATLAS V3.1.7 的系统架构。采用双层设计：外层 agent 循环负责工具调用的编排，内层 V3 pipeline 则生成多样化的代码候选，并配合构建验证与基于能量的选择。
 
 ---
 
@@ -53,7 +53,7 @@ llama-server 是唯一使用 GPU 的服务；其余每个 ATLAS 服务都跑在 
 | **Vulkan**（跨厂商回退） | 预览 (Preview) | `inference/Dockerfile.vulkan` → `atlas-llama-vulkan` | `docker-compose.vulkan.yml` | lavapipe CPU 启动路径（已冒烟测试）；尚无真实 GPU 验证 |
 | **SYCL** (Intel Arc) | 路线图 (Roadmap) —— Intel Arc 目前使用 `vulkan` | 待定 | 待定 | — |
 
-**后端选择发生在安装时，而非运行时。** `atlas init` 运行 `tier.detect_gpu()`（见 `atlas/cli/commands/tier.py`），在所有检测到的厂商中挑选显存最大的 GPU（可用 `ATLAS_GPU_VENDOR` / `ATLAS_GPU_INDEX` 覆盖），并把 `ATLAS_BACKEND={cuda|rocm|metal|vulkan}` 写入 `.env`。当主机存在打包好的原生后端时，检测会解析到它：NVIDIA 用 CUDA，x86_64 上的 AMD 用 ROCm，macOS 用混合 Metal 路径。当主机没有打包好的原生后端时（Intel Arc、arm64 上的 AMD、无法识别的厂商），向导会提供 Vulkan 通用回退（默认选是）：一个镜像覆盖 AMD、Intel、Adreno、MoltenVK 和 lavapipe CPU 光栅化器，性能比调优过的原生后端低大约 20–40%。只有当完全不存在可用的后端时，它才会拒绝 —— 而不是写出一个无法启动的 `.env`。每个后端都有自己预构建的镜像；用户不会运行一个打包了所有后端库的臃肿镜像。
+**后端选择发生在安装时，而非运行时。** `atlas init` 运行 `tier.detect_gpu()`（见 `atlas/commands/tier.py`），在所有检测到的厂商中挑选显存最大的 GPU（可用 `ATLAS_GPU_VENDOR` / `ATLAS_GPU_INDEX` 覆盖），并把 `ATLAS_BACKEND={cuda|rocm|metal|vulkan}` 写入 `.env`。当主机存在打包好的原生后端时，检测会解析到它：NVIDIA 用 CUDA，x86_64 上的 AMD 用 ROCm，macOS 用混合 Metal 路径。当主机没有打包好的原生后端时（Intel Arc、arm64 上的 AMD、无法识别的厂商），向导会提供 Vulkan 通用回退（默认选是）：一个镜像覆盖 AMD、Intel、Adreno、MoltenVK 和 lavapipe CPU 光栅化器，性能比调优过的原生后端低大约 20–40%。只有当完全不存在可用的后端时，它才会拒绝 —— 而不是写出一个无法启动的 `.env`。每个后端都有自己预构建的镜像；用户不会运行一个打包了所有后端库的臃肿镜像。
 
 **自带模型的表面（V3.1.1）。** `atlas lens check` 是针对运行中的 llama-server 的一次廉价预检，用于报告当前加载的模型是否与 Lens 兼容。`atlas lens build --samples <path>` 封装了 `geometric-lens/geometric_lens/training.py`，按模型原生的嵌入维度训练全新的 C(x)（`cost_field.pt`）**和** G(x)（XGBoost）工件。二者结合让用户无需 fork lens 代码即可换入非默认的 GGUF —— C(x) 构造函数接受任意 `input_dim`，因此逐模型变化的只有训练出来的权重。面向用户的流程见 [CLI.md § atlas lens](../../CLI.md#atlas-lens)；`atlas lens publish`（或合并的 `atlas publish`）会把工件上传到 HuggingFace，并开出固定其哈希的注册表 PR。
 
@@ -86,19 +86,20 @@ K3s 部署路径（`scripts/install.sh`，清单在 `templates/` 中）截至 V3
 
 代理是聊天前端的入口点。它在 `/v1/agent` 上接收用户消息（类型化事件流 —— TUI 使用的就是它），并运行一个内部 agent 循环：调用 llama-server、解析工具调用、执行它们，然后把事件流式回传。`/v1/chat/completions` 端点是对 llama-server 的透明透传；保留它是为了 SDK 兼容性，它并不运行 agent 循环。完整的事件类型目录见 [API.md](../../API.md)。
 
-代理由 12 个 Go 文件组成，每个文件只负责一件事：
+代理由 13 个 Go 文件组成，每个文件只负责一件事：
 
 | 文件 | 职责 |
 |---|---|
 | `main.go` | HTTP 服务器、路由、鉴权、透传、错误信封、私密值日志过滤 |
 | `agent.go` | agent 循环：轮次状态、LLM 调用、计划生成、模式上下文注入、卡死循环断路器 |
-| `tools.go` | 14 个工具定义与执行器、层级分类、工具调用语法 |
+| `tools.go` | 15 个工具定义与执行器、层级分类、工具调用语法 |
 | `gates.go` | 诚实性/计划闸门：声明校验、结构、语法、内嵌脚本、计划遵循、计划提醒、资源 lint |
 | `detectors.go` | 卡死模式检测：工具重复、推理重复、traceback 定位 |
 | `context.go` | 上下文增强：符号索引、项目扫描、工作区隔离、会话文件清单 |
 | `permissions.go` | 权限闸门（`/v1/permission`）、信任模式、硬阻断模式 |
 | `lens.go` | lens 打分调用、lens 样本入库（`/feedback`）、校准状态 |
 | `guardrails.go` | 按工具的引导防护（收缩、缺失命令/模块的引导、doctype 剥离） |
+| `shell_wrapper.go` | `validateShellCommand` 背后的命令策略：拆分复合命令，最多深入 16 层检查执行包装器（`sh -c`、`eval` 等），拒绝灾难性命令和无法检查的包装器 |
 | `events.go` | 类型化信封 broker（`/events`）与 SSE 管道 |
 | `v3_bridge.go` | 面向 v3-service `/v3/generate` + `/v3/plan` 的 SSE 客户端 |
 | `types.go` | 共享类型、层级、轮次上限 |
@@ -163,7 +164,7 @@ flowchart LR
 
 ### 工具
 
-`proxy/tools.go` 中注册了 14 个工具：
+`proxy/tools.go` 中注册了 15 个工具：
 
 | 工具 | 用途 | 只读 |
 |------|---------|-----------|
@@ -171,6 +172,7 @@ flowchart LR
 | `outline_file` | 列出文件的顶层函数/类及其行号范围，不含函数体（`.py` 使用 tree-sitter，其余为尽力而为的扫描）。外科式读取的入口点：先 outline，再用带 offset/limit 的 `read_file` | 是 |
 | `write_file` | 创建一个新文件（对超过 5 行的已有文件会被拒绝 —— 见安全限制） | 否 |
 | `edit_file` | 针对 ≤10 行改动的外科式内联字符串替换（old_str/new_str） | 否 |
+| `insert_after` | 在给定行号（即 `read_file` 打印的行号）之后插入新行。用于在不改动任何已有内容的情况下新增（ADDING）代码（分支、函数、import）：无需复现 `old_str`，而在长跨度上失败的正是这一步 | 否 |
 | `structural_edit` | 通过 tree-sitter 选择器（`function:NAME`、`class:NAME`、`<tag>`）对整个函数/类/HTML 元素进行重写；对整节点替换而言，必须优先于 edit_file 使用。GH #39，v1 中仅支持 .py/.html/.htm | 否 |
 | `delete_file` | 删除文件或空目录（之后强制退出循环） | 否 |
 | `move_file` | 在工作区内移动或重命名文件（例如 `index.html` → `templates/`）。纯粹的重定位 —— 绕过 V3/外科式编辑门控，拒绝覆盖已存在的目标。由于 shell `mv`/`cp` 会被拒绝，这是"重新组织文件"的受支持路径 | 否 |

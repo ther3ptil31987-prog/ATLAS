@@ -121,8 +121,8 @@ curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-
 # Pinned to a release: fetch the script AT the tag and install that tag.
 # The checkout is pinned to the (SSH-signed) tag and ATLAS_IMAGE_TAG is
 # pinned to the matching cosign-signed images.
-curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.7/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.7 bash
 
 # Review before running: download, read, then execute the same bytes.
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh
@@ -144,7 +144,7 @@ bash atlas-bootstrap.sh
 | `ATLAS_BOOTSTRAP_REF=vX.Y.Z` | `main`을 추적하는 대신 git 태그/sha에 설치를 고정; `vX.Y.Z` 값은 `ATLAS_IMAGE_TAG`도 대응 이미지에 고정합니다 |
 | `ATLAS_INSTALL_DIR=/path` | 클론 위치(기본 `/opt/atlas` — 아래 참고) |
 | `ATLAS_REPO_URL=https://...` | 대체 저장소 URL |
-| `ATLAS_GO_VERSION=1.26.2` | TUI 빌드에 설치되는 Go 툴체인 버전 (TUI는 1.26.2+가 필요하며, 구형 툴체인이 설치되어 있으면 자동으로 이를 가져옵니다) |
+| `ATLAS_GO_VERSION=1.26.10` | TUI 빌드에 설치되는 Go 툴체인 버전 (TUI는 1.26.10+가 필요하며, 구형 툴체인이 설치되어 있으면 자동으로 이를 가져옵니다) |
 
 **왜 `/opt/atlas`인가?** 시스템 전역 서드파티 소프트웨어의 표준 FHS 접두사이고, `$HOME` 정리에도 살아남으며, 같은 머신의 여러 사용자가 하나의 설치를 공유할 수 있기 때문입니다. 홈 디렉토리에 설치하고 싶다면:
 
@@ -235,13 +235,13 @@ case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *)
 # 3. Select/install a model and write model-aware runtime sizing
 atlas init
 
-# 4. Install Go 1.26.2+ — required for the TUI client (atlas tui) and
+# 4. Install Go 1.26.10+ — required for the TUI client (atlas tui) and
 #    optional for the proxy (proxy builds automatically on first run if Go
 #    is present; otherwise it runs in Docker with file access limited to
 #    ATLAS_PROJECT_DIR). Quickest path:
 mkdir -p /tmp/go-install && cd /tmp/go-install
-curl -LO https://go.dev/dl/go1.26.2.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.2.linux-amd64.tar.gz
+curl -LO https://go.dev/dl/go1.26.10.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.10.linux-amd64.tar.gz
 echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 cd -
@@ -519,7 +519,7 @@ K3s 설치는 대신 `scripts/uninstall.sh`를 사용합니다. 이 스크립트
 
 | 요구 사항 | 세부 내용 |
 |-------------|---------|
-| **Go 1.26.2+** | atlas-proxy와 atlas-tui 클라이언트 빌드용 (구형 Go 툴체인은 자동으로 이를 가져옵니다) |
+| **Go 1.26.10+** | atlas-proxy와 atlas-tui 클라이언트 빌드용 (구형 Go 툴체인은 자동으로 이를 가져옵니다) |
 | **llama.cpp** | CUDA로 소스 빌드 ([llama.cpp 빌드 안내](https://github.com/ggml-org/llama.cpp?tab=readme-ov-file#build) 참고) |
 | **Node.js 20+** | 샌드박스의 JavaScript/TypeScript 실행에 필요 |
 | **Rust** | 샌드박스의 Rust 실행에 필요 |
@@ -604,13 +604,15 @@ cd /path/to/your/project
 atlas    # Checks atlas-proxy is reachable, then launches the TUI
 ```
 
-`atlas`는 `atlas-tui` 바이너리가 없거나 체크아웃보다 오래된 경우 `tui/`에서 자동으로 빌드하며(PATH에 Go 1.26.2+ 필요), TUI로 넘어가기 전에 localhost:8090의 프록시를 검증합니다.
+`atlas`는 `atlas-tui` 바이너리가 없거나 체크아웃보다 오래된 경우 `tui/`에서 자동으로 빌드하며(PATH에 Go 1.26.10+ 필요), TUI로 넘어가기 전에 localhost:8090의 프록시를 검증합니다.
 
 ---
 
 ## 방법 3: K3s
 
 GPU 스케줄링, 헬스 프로브, 리소스 제한을 갖춘 Kubernetes 배포입니다. 프리뷰(Preview) — 템플릿은 CI에서 검증·렌더링되며, 자동화된 라이브 클러스터 테스트는 없습니다.
+
+> **네트워크 노출.** 이 방법은 다섯 서비스를 모두 NodePort로 게시합니다(기본값 `30080`, `32735`, `31144`, `30070`, `30820`). NodePort는 `127.0.0.1`뿐 아니라 노드의 모든 네트워크 주소에서 응답하므로, 같은 네트워크의 다른 머신이 서비스에 접근할 수 있습니다. K3s 템플릿은 서비스 토큰을 마운트하지 않으므로, 이 방법에서는 어떤 서비스도 토큰을 확인하지 않습니다. 이 방법은 신뢰할 수 있는 네트워크에서만 사용하거나, 호스트 방화벽으로 이 포트들을 다른 머신에 대해 닫으세요. Docker Compose 방법은 게시하는 모든 포트를 `127.0.0.1`에 바인딩합니다.
 
 ### 추가 사전 요구 사항
 

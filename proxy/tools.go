@@ -123,9 +123,11 @@ func executeToolCall(name string, args json.RawMessage, ctx *AgentContext) *Tool
 			Error:   missingArgsHint(name),
 		}
 	}
-	if reason := validateToolWorkspacePaths(name, args, ctx); reason != "" {
-		return &ToolResult{Success: false, Error: reason}
+	canonical, rejection := canonicalToolArgs(name, args, ctx)
+	if rejection != "" {
+		return &ToolResult{Success: false, Error: rejection}
 	}
+	args = canonical
 	// Safety deny-list — sensitive targets (.env, *.pem, *credentials*,
 	// destructive shell patterns) are refused in every permission mode.
 	if denied, reason := shouldDenyToolCall(name, args); denied {
@@ -2849,8 +2851,8 @@ func runCommandTool() *ToolDef {
 			// read_file / list_directory still work. validateShellCommand
 			// upstream is the gate; this is the executor.
 			//
-			// When ctx.VerifyOnHost is set (ATLAS_VERIFY_IN=host
-			// or per-project config), we BYPASS the sandbox and execute
+			// When ctx.VerifyOnHost is set (ATLAS_VERIFY_IN=host with
+			// ATLAS_TRUST_MODE=fully-trusted), we BYPASS the sandbox and execute
 			// on the host directly. This is the right call for working
 			// codebases that depend on host-side state — the user's
 			// installed venv binaries, system tools, env vars,

@@ -51,6 +51,8 @@ The main entry point. Wraps llama-server with an agent loop, grammar-constrained
 
 **Catch-all:** any unmatched path is proxied directly to llama-server.
 
+**Requests:** send each POST body with `Content-Type: application/json`; a POST of another type gets 415. A request that carries an `Origin` header gets 403 unless its origin is on `ATLAS_ALLOWED_ORIGINS` (see [Configuration](CONFIGURATION.md)).
+
 ---
 
 ### POST /v1/agent
@@ -403,7 +405,7 @@ Defined in `proxy/tools.go`. Used by the model when responding `{"type":"tool_ca
 | `search_files` | Regex search inside file **contents**. Returns matching lines with file paths and line numbers |
 | `find_file` | Regex search by file **name** or relative path. Use to check whether a file exists. |
 | `list_directory` | List files and subdirectories at a given path |
-| `run_command` | Execute a shell command via bash inside the **sandbox container**. Sees `/workspace` (your project, bind-mounted rw, same path as the proxy). Has python3 + pip, node + npm, go, rust, gcc/g++, bash, pytest, tsx pre-installed. When the sandbox is unreachable the tool fails with `sandbox unavailable: ...` (exit code 1) — it never falls back to executing on the proxy host. Host execution happens only when the operator explicitly selects it via `ATLAS_VERIFY_IN=host` or `target = "host"` under `[execution]` in `.atlas/config.toml` **and** `ATLAS_TRUST_MODE=fully-trusted`. The default `trusted` silently downgrades a host request back to the sandbox, and `untrusted` refuses `run_command`/`run_background` outright. The proxy still runs `validateShellCommand` upstream as the destructive-verb gate — this entry just picks the executor. |
+| `run_command` | Execute a shell command via bash inside the **sandbox container**. Sees `/workspace` (your project, bind-mounted rw, same path as the proxy). Has python3 + pip, node + npm, go, rust, gcc/g++, bash, pytest, tsx pre-installed. When the sandbox is unreachable the tool fails with `sandbox unavailable: ...` (exit code 1) — it never falls back to executing on the proxy host. Host execution happens only when the operator explicitly selects it via `ATLAS_VERIFY_IN=host` **and** `ATLAS_TRUST_MODE=fully-trusted`; a workspace's `.atlas/config.toml` may choose the sandbox, but not the host. The default `trusted` silently downgrades a host request back to the sandbox, and `untrusted` refuses `run_command`/`run_background` outright. The proxy still runs `validateShellCommand` upstream as the destructive-verb gate — this entry just picks the executor. |
 | `run_background` | Start a long-running process (e.g. `python app.py`, `npm run dev`) in the sandbox and return immediately with a `job_id`. The proxy detects shell `&` backgrounding through `run_command` and routes it here. |
 | `tail_background` | Fetch new stdout/stderr lines from a backgrounded job by `job_id`. |
 | `stop_background` | Terminate a backgrounded job by `job_id`. |

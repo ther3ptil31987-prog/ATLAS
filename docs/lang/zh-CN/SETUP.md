@@ -120,8 +120,8 @@ curl -fsSL https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-
 # Pinned to a release: fetch the script AT the tag and install that tag.
 # The checkout is pinned to the (SSH-signed) tag and ATLAS_IMAGE_TAG is
 # pinned to the matching cosign-signed images.
-curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.6/scripts/atlas-bootstrap.sh \
-  | ATLAS_BOOTSTRAP_REF=v3.1.6 bash
+curl -fsSL https://raw.githubusercontent.com/inferstep/ATLAS/v3.1.7/scripts/atlas-bootstrap.sh \
+  | ATLAS_BOOTSTRAP_REF=v3.1.7 bash
 
 # Review before running: download, read, then execute the same bytes.
 curl -fsSL -o atlas-bootstrap.sh https://raw.githubusercontent.com/itigges22/ATLAS/main/scripts/atlas-bootstrap.sh
@@ -143,7 +143,7 @@ bash atlas-bootstrap.sh
 | `ATLAS_BOOTSTRAP_REF=vX.Y.Z` | 把安装固定到某个 git 标签/sha 而不是跟踪 `main`；`vX.Y.Z` 形式的值还会把 `ATLAS_IMAGE_TAG` 固定到对应的镜像 |
 | `ATLAS_INSTALL_DIR=/path` | 克隆到哪里（默认 `/opt/atlas` —— 见下文） |
 | `ATLAS_REPO_URL=https://...` | 替代的仓库 URL |
-| `ATLAS_GO_VERSION=1.26.2` | 为构建 TUI 安装的 Go 工具链版本（TUI 需要 1.26.2+；已安装的更老工具链会自动拉取它） |
+| `ATLAS_GO_VERSION=1.26.10` | 为构建 TUI 安装的 Go 工具链版本（TUI 需要 1.26.10+；已安装的更老工具链会自动拉取它） |
 
 **为什么是 `/opt/atlas`？** 它是系统级第三方软件的标准 FHS 前缀，不会被 `$HOME` 清理波及，还能让同一台机器上的多个用户共享一份安装。如果你更希望装进自己的家目录：
 
@@ -234,13 +234,13 @@ case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *)
 # 3. Select/install a model and write model-aware runtime sizing
 atlas init
 
-# 4. Install Go 1.26.2+ — required for the TUI client (atlas tui) and
+# 4. Install Go 1.26.10+ — required for the TUI client (atlas tui) and
 #    optional for the proxy (proxy builds automatically on first run if Go
 #    is present; otherwise it runs in Docker with file access limited to
 #    ATLAS_PROJECT_DIR). Quickest path:
 mkdir -p /tmp/go-install && cd /tmp/go-install
-curl -LO https://go.dev/dl/go1.26.2.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.2.linux-amd64.tar.gz
+curl -LO https://go.dev/dl/go1.26.10.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.10.linux-amd64.tar.gz
 echo 'export PATH="/usr/local/go/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 cd -
@@ -518,7 +518,7 @@ K3s 安装改用 `scripts/uninstall.sh`，它会拆除清单文件并（可选�
 
 | 要求 | 详情 |
 |-------------|---------|
-| **Go 1.26.2+** | 用于构建 atlas-proxy 和 atlas-tui 客户端（更老的 Go 工具链会自动拉取它） |
+| **Go 1.26.10+** | 用于构建 atlas-proxy 和 atlas-tui 客户端（更老的 Go 工具链会自动拉取它） |
 | **llama.cpp** | 从源码编译并启用 CUDA（参见 [llama.cpp 构建说明](https://github.com/ggml-org/llama.cpp?tab=readme-ov-file#build)） |
 | **Node.js 20+** | 沙箱执行 JavaScript/TypeScript 所需 |
 | **Rust** | 沙箱执行 Rust 所需 |
@@ -603,13 +603,15 @@ cd /path/to/your/project
 atlas    # Checks atlas-proxy is reachable, then launches the TUI
 ```
 
-如果 `atlas-tui` 二进制缺失或比检出代码旧，`atlas` 会自动从 `tui/` 构建它（需要 PATH 中有 Go 1.26.2+），并在移交给 TUI 之前验证 localhost:8090 上的代理。
+如果 `atlas-tui` 二进制缺失或比检出代码旧，`atlas` 会自动从 `tui/` 构建它（需要 PATH 中有 Go 1.26.10+），并在移交给 TUI 之前验证 localhost:8090 上的代理。
 
 ---
 
 ## 方式 3：K3s
 
 支持 GPU 调度、健康探针和资源限制的 Kubernetes 部署。预览 (Preview) 级别 —— 模板在 CI 中校验并渲染；没有自动化的真实集群测试。
+
+> **网络暴露。** 此方式将全部五个服务以 NodePort 发布（默认 `30080`、`32735`、`31144`、`30070`、`30820`）。NodePort 会在节点的每个网络地址上应答，而不仅是 `127.0.0.1`，因此同一网络上的其他机器可以访问这些服务。K3s 模板不挂载服务令牌，因此在此方式下没有任何服务检查令牌。请仅在可信网络上使用此方式，或用主机防火墙对其他机器关闭这些端口。Docker Compose 方式会把每个发布的端口绑定到 `127.0.0.1`。
 
 ### 额外前置要求
 

@@ -47,7 +47,7 @@ The top-level `atlas` binary also dispatches to non-TUI subcommands:
 | `atlas diagnostics collect [--output FILE] [--log-lines N]` | Write a shareable JSON diagnostic bundle: versions, platform, filtered config (secret-ish values masked, service token dropped), per-service health plus proxy readiness and calibration status, `docker compose images` output, recent logs (private-value-filtered), and the doctor report. Source code is excluded; safe to attach to an issue after review. |
 | `atlas config validate \| migrate [.env] [--dry-run]` | Typed `.env` validation (type/range/enum checks, unknown-key + deprecated-key warnings) so misconfiguration fails before startup; `migrate` forward-migrates to the current config schema version (drops deprecated keys, stamps `ATLAS_CONFIG_SCHEMA_VERSION`, backs up `.env.bak`). `migrate --dry-run` previews the changes without writing. |
 | `atlas artifact verify \| snapshot \| rollback [DIR]` | Verify a lens/ASA bundle's manifest signature + per-file SHA-256 (tamper-detection), keep a previous-bundle snapshot before activating a new one, or restore it. Default DIR is the lens models dir. |
-| `atlas rollback [--to TAG] [--yes]` | Return the deployment to a working release. With no argument, restores the last upgrade's previous release from the recorded restore point; `--to <tag>` points at a specific immutable tag. See OPERATIONS.md § Rolling back. |
+| `atlas rollback [--to TAG] [--yes]` | Return the deployment to a working release. With no argument, restores the last upgrade's previous release from the recorded restore point; `--to <tag>` points at a specific immutable tag. Either way the target images' signatures are verified first, as `atlas upgrade` does. See OPERATIONS.md § Rolling back. |
 
 `atlas --help` (or `-h`) prints the subcommand list. `atlas --version` (or `-V`) prints the CLI version. An unknown subcommand prints the same usage to stderr and exits 2.
 
@@ -56,7 +56,7 @@ The top-level `atlas` binary also dispatches to non-TUI subcommands:
 1. **Locates the `atlas-tui` binary** on `$PATH` or in `~/.local/bin`.
 2. **Builds from source** in `tui/` when `go` is on `PATH` and the
    binary is missing or stale (older than the TUI sources). `tui/go.mod`
-   requires Go 1.26.2+; older toolchains auto-fetch the required
+   requires Go 1.26.10+; older toolchains auto-fetch the required
    version. (~10 s on first run.)
 3. **Ensures atlas-proxy is running** via `atlas.runtime.ensure_proxy()`. If the
    proxy's `/workspace` bind-mount doesn't already cover your current
@@ -810,7 +810,7 @@ auto-realigns on launch.
 
 ### "atlas-tui binary not found and Go is not available"
 
-Install Go 1.26.2+ from [https://go.dev/dl/](https://go.dev/dl/)
+Install Go 1.26.10+ from [https://go.dev/dl/](https://go.dev/dl/)
 (older installed toolchains auto-fetch the required version), or
 build manually:
 

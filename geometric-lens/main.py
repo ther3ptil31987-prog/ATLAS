@@ -73,7 +73,9 @@ logger = logging.getLogger(__name__)
 try:
     get_db_pool()
 except Exception as e:
-    logger.error(f"Failed to initialize SQLite state store: {e}")
+    logger.error(f"Failed to initialize SQLite state store: {e}. If the lens-state volume belongs to another user, "
+                 f"give it to this one once, which keeps its data: docker compose run --rm --no-deps --user root "
+                 f"geometric-lens chown -R {os.getuid()}:{os.getgid()} /data/state")
 
 
 # Boot-time self-test cache. Populated in lifespan() and re-populated after a

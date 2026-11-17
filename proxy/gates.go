@@ -41,6 +41,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -1347,15 +1348,17 @@ func assetLintFindings(workingDir string) []string {
 	}
 	var files []entry
 	count := 0
-	filepath.Walk(workingDir, func(path string, info os.FileInfo, err error) error {
+	dir := openConfinedDir(workingDir) // reads stay inside the workspace
+	defer dir.Close()
+	_ = dir.Walk(func(rel string, item fs.DirEntry, err error) error { // its one error, "too large", is in count
 		if err != nil {
 			return nil
 		}
-		name := info.Name()
-		if info.IsDir() {
+		name := item.Name()
+		if item.IsDir() {
 			if strings.HasPrefix(name, ".") || name == "node_modules" ||
 				name == "venv" || name == "__pycache__" {
-				return filepath.SkipDir
+				return fs.SkipDir
 			}
 			return nil
 		}
@@ -1363,17 +1366,13 @@ func assetLintFindings(workingDir string) []string {
 		if count > assetLintMaxFiles {
 			return fmt.Errorf("project too large")
 		}
-		if info.Size() > assetLintMaxFileBytes {
+		if info, ierr := item.Info(); ierr != nil || info.Size() > assetLintMaxFileBytes {
 			return nil
 		}
 		switch strings.ToLower(filepath.Ext(name)) {
 		case ".py", ".html", ".htm", ".js", ".css", ".jinja", ".jinja2":
-			data, rerr := os.ReadFile(path)
+			data, rerr := dir.ReadFile(rel)
 			if rerr != nil {
-				return nil
-			}
-			rel, rerr2 := filepath.Rel(workingDir, path)
-			if rerr2 != nil {
 				return nil
 			}
 			files = append(files, entry{rel: filepath.ToSlash(rel), content: string(data)})

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -940,22 +942,45 @@ func TestPatternMatchHintSkipsLonelyDir(t *testing.T) {
 	}
 }
 
-func TestResolveVerifyTargetEnvAndConfig(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("ATLAS_VERIFY_IN", "")
-	if got := resolveVerifyTarget(dir); got != "sandbox" {
-		t.Errorf("default = %q, want sandbox", got)
-	}
-	t.Setenv("ATLAS_VERIFY_IN", "host")
-	if got := resolveVerifyTarget(dir); got != "host" {
-		t.Errorf("env-host = %q, want host", got)
-	}
-	// Per-project config wins.
-	os.MkdirAll(filepath.Join(dir, ".atlas"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".atlas", "config.toml"),
-		[]byte("[execution]\ntarget = \"sandbox\"\n"), 0o644)
-	if got := resolveVerifyTarget(dir); got != "sandbox" {
-		t.Errorf("config override = %q, want sandbox", got)
+// Only the operator chooses the host, with both settings. The workspace's
+// settings file may choose the sandbox; a file that names the host is
+// ignored, with a log line.
+func TestOnlyTheOperatorChoosesTheHostAsTheVerifyTarget(t *testing.T) {
+	for _, c := range []struct {
+		name, verifyIn, trustMode, fileTarget, want string
+		wantLogLine                                 bool
+	}{
+		{"the defaults", "", "", "", "sandbox", false},
+		{"the operator's host, fully trusted", "host", "fully-trusted", "", "host", false},
+		{"the operator's host, with the default trust mode", "host", "", "", "sandbox", false},
+		{"the workspace file names the host", "", "", "host", "sandbox", true},
+		{"the workspace file names the sandbox", "host", "fully-trusted", "sandbox", "sandbox", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("ATLAS_VERIFY_IN", c.verifyIn)
+			t.Setenv("ATLAS_TRUST_MODE", c.trustMode)
+			dir := t.TempDir()
+			if c.fileTarget != "" {
+				if err := os.MkdirAll(filepath.Join(dir, ".atlas"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				settings := "[execution]\ntarget = \"" + c.fileTarget + "\"\n"
+				if err := os.WriteFile(filepath.Join(dir, ".atlas", "config.toml"), []byte(settings), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var logged bytes.Buffer
+			oldOutput := log.Writer()
+			log.SetOutput(&logged)
+			got := resolveVerifyTarget(dir)
+			log.SetOutput(oldOutput)
+			if got != c.want {
+				t.Errorf("verify target = %q, want %q", got, c.want)
+			}
+			if hasLine := strings.Contains(logged.String(), `names target = "host"; ignored`); hasLine != c.wantLogLine {
+				t.Errorf("log = %q; want the line that the file's host is ignored: %v", logged, c.wantLogLine)
+			}
+		})
 	}
 }
 

@@ -1,8 +1,10 @@
 name: tests
 
 # Runs on every push to main/dev and every PR. All jobs run on the free
-# ubuntu-latest runner — no GPU, no large model downloads, no real
-# Docker compose stack. The install-test.yml workflow handles the
+# GitHub-hosted Ubuntu runner — no GPU, no large model downloads, no real
+# Docker compose stack. Every workflow names the runner image (ubuntu-24.04)
+# and not `ubuntu-latest`, so the image changes when a pull request changes
+# it and its checks pass, not on the day GitHub moves the label. The install-test.yml workflow handles the
 # distro-matrix bootstrap dry-run; this file is for code-level checks
 # (Go test, Python pytest, shellcheck, compose validate).
 
@@ -24,7 +26,7 @@ permissions:
 jobs:
   go-tests:
     name: go test (${{ matrix.module }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -34,11 +36,11 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
-          # 1.26 covers both modules (tui requires 1.26+ via go.mod;
-          # proxy's 1.24 floor builds fine on it). setup-go v6 pins
+          # 1.26.10 covers both modules (tui's go.mod requires 1.26.10;
+          # proxy's 1.24 floor builds fine on it). setup-go pins
           # GOTOOLCHAIN=local, so the version here must satisfy every
           # module — no auto-fetch.
-          go-version: '1.26'
+          go-version: '1.26.10'
           cache-dependency-path: ${{ matrix.module }}/go.sum
 
       - name: go test -race
@@ -52,7 +54,7 @@ jobs:
 
   python-tests:
     name: pytest (${{ matrix.subset }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -124,12 +126,12 @@ jobs:
 
   perf-gate:
     name: perf budget gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
-          go-version: '1.26'
+          go-version: '1.26.10'
           cache-dependency-path: proxy/go.sum
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
@@ -144,7 +146,7 @@ jobs:
 
   ruff:
     name: ruff (python lint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
@@ -186,7 +188,7 @@ jobs:
 
   shellcheck:
     name: shellcheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
@@ -201,7 +203,7 @@ jobs:
 
   compose-validate:
     name: docker compose config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
@@ -220,7 +222,7 @@ jobs:
 
   yamllint:
     name: yamllint (workflows)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
@@ -242,13 +244,13 @@ jobs:
     # candidate landed on disk — plus V3-unreachable/malformed/timeout
     # and lens-unreachable failure modes. No GPU, no model download.
     name: e2e acceptance (proxy + sandbox + fake llama)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
-          go-version: '1.26'
+          go-version: '1.26.10'
           cache-dependency-path: proxy/go.sum
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
@@ -294,7 +296,7 @@ jobs:
     # When this fails: see docs/TROUBLESHOOTING.md § "llama.cpp patch
     # drift" for the bump runbook.
     name: llama.cpp patches apply to pinned SHA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
@@ -368,7 +370,7 @@ jobs:
     # ./sandbox` runs (and four chances to hit an upstream package-mirror
     # flake). The matrix keeps the same four verdicts on one job definition.
     name: ${{ matrix.language }} sandbox smoke (containerized)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

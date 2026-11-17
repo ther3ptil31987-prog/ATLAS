@@ -31,20 +31,22 @@ COPY geometric_lens/ geometric_lens/
 RUN mkdir -p /app/config /app/secrets /data/state
 
 # Non-root application account created inside this image. /app files stay
-# root-owned + world-readable (COPY default); /data/state is chowned so a
-# freshly-created lens-state volume inherits writable ownership. HOME is
+# root-owned + world-readable (COPY default); /data/state is mode 1777 so a
+# freshly-created lens-state volume is writable for the user that
+# docker-compose.yml runs the lens as (the installing user). HOME is
 # a writable home for library caches (numpy/torch config, tiktoken);
 # bytecode caching is disabled so Python never tries to write .pyc into
 # /app.
 #
-# NOTE: an EXISTING lens-state volume was created root-owned by a prior
-# image; after upgrading, chown it once —
-#   docker compose run --rm --user root geometric-lens chown -R lens:lens /data/state
-# — or recreate the volume. Fresh installs need nothing.
+# NOTE: an EXISTING lens-state volume keeps the owner a prior image gave
+# it; after upgrading, give it to the installing user once, which keeps
+# its data —
+#   docker compose run --rm --no-deps --user root geometric-lens chown -R "$(id -u):$(id -g)" /data/state
+# Fresh installs need nothing.
 ENV PYTHONDONTWRITEBYTECODE=1
 RUN groupadd --gid 1001 lens \
     && useradd --create-home --uid 1001 --gid 1001 lens \
-    && chown -R lens:lens /data/state
+    && chown -R lens:lens /data/state && chmod 1777 /data/state
 USER lens
 ENV HOME=/home/lens
 

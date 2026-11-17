@@ -4,6 +4,94 @@
 
 ## [Unreleased]
 
+## [3.1.7] - 2026-10-24 — Maia
+
+A security release with installer, build and documentation fixes.
+
+### Security: the service token could go to an address outside the stack
+
+- Each service added the service token to its outbound requests without
+  checking where they went, so the token could leave the stack, for
+  example with a redirect. Now each service adds it only to a request for
+  one of the stack's own addresses, checks every step of a redirect again,
+  and drops the token on a redirect to another origin. The Hugging Face
+  token goes only with a download from huggingface.co.
+  (GHSA-543g-qfqh-q498)
+
+### Security: the proxy could read project files outside the workspace
+
+- Eight of the proxy's own reads of project files, such as a plan's
+  context sample, the project scan and the web-asset check, used plain
+  file calls, so a name in the workspace that resolves outside it could
+  make the proxy read a file outside the workspace. They now read through
+  one confined reader, as the file tools do, and such a name is skipped.
+  The steering status reads its place in the workspace the same way.
+  (GHSA-f7jr-f255-59p6)
+
+### Security: the TUI wrote control characters from the proxy to the terminal
+
+- Text from the proxy, such as the model's text and tool results, reached
+  the terminal with its control characters and direction marks. The TUI now
+  shows each of them marked; the stored text does not change.
+  (GHSA-cjfr-rrgx-2g38)
+
+### Security: a tool could use a path the workspace check had not passed
+
+- The workspace check and a tool could read different values from one
+  tool call, so the tool could use a path the check had not passed. The
+  check now reads a call's arguments once and hands the tool that one
+  reading; a call it cannot read that way is refused before the tool
+  runs. (GHSA-62cf-6h99-6cv9)
+
+### Security fixes without an advisory
+
+- The lens and the V3 service could not read the token file that
+  `atlas init` makes, so they ran without the token check. They now run
+  as the installing user, every service stops with a message when the
+  token file is there but cannot be read, and `atlas doctor` reports it.
+- `atlas rollback` checks the target images' signatures before it changes
+  `.env` or pulls anything, as `atlas upgrade` does.
+- `atlas lens check` reads `cost_field.pt` only in torch's restricted
+  mode, as the lens service does.
+- The proxy refuses a POST whose body is not JSON (415) and a request from
+  a web origin that is not on the new `ATLAS_ALLOWED_ORIGINS` setting
+  (403). The TUI and the CLI send neither, so they are not affected.
+- A workspace's `.atlas/config.toml` can no longer make `run_command` run
+  on the host: only the operator chooses the host, with
+  `ATLAS_VERIFY_IN=host` together with `ATLAS_TRUST_MODE=fully-trusted`.
+
+### Fixes
+
+- Each build of the model server names the processor level of its CPU
+  part, so the image runs on every amd64 processor with AVX2, whatever
+  processor built it. (#427)
+- `uninstall.sh --data` names every folder it removes, the projects folder
+  included, and refuses an empty setting. (#414)
+- The bootstrap script tries a failed download again. (#406)
+- The installer keeps its downloads and logs in a temporary folder of its
+  own. (#409)
+- The bootstrap's TUI build runs the Go that the script found. (#535)
+- The proxy image and the TUI build with Go 1.26.10, which has the fixes of
+  the Go standard library; the bootstrap installs Go 1.26.10.
+- The TUI's modules move to their fixed versions: x/net v0.60.0 and
+  x/text v0.42.0 (#542), and goldmark v1.7.17.
+
+### Documentation
+
+- The K3s method says that its services answer on every network address of
+  the node and check no token, so it is for a trusted network only; the
+  scope section of SECURITY.md and SUPPORT_MATRIX.md say the same.
+- The configuration page says that the shell gate unwraps a command up to
+  16 layers deep.
+- The architecture pages name the proxy's 13 Go files and 15 tools.
+- The ja, ko and zh-CN architecture pages name `atlas/commands/tier.py`.
+- The ja, zh-CN and ko troubleshooting pages say how the sandbox network
+  works.
+
+### CI
+
+- Every CI job names its runner image, `ubuntu-24.04`.
+
 ## [3.1.6] - 2026-10-01 — Maia
 
 A security release. It changes nothing else.
